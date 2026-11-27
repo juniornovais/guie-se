@@ -1,15 +1,15 @@
 # Configuração e publicação
 
-Guia passo a passo para colocar o Guie-se no ar com **Vercel** (aplicação Next.js) e **Supabase** (PostgreSQL + Auth), com login Google.
+Guia passo a passo para colocar o Guie-se no ar com **Render** (aplicação Next.js) e **Supabase** (PostgreSQL + Auth), com login Google.
 
-Ordem recomendada: 1) Supabase → 2) Google OAuth → 3) Supabase Auth → 4) Vercel → 5) verificação.
+Aplique as migrations e rode o seed no Supabase. Crie o serviço no Render para obter sua URL pública e use essa URL na configuração do login com Google.
 
 ---
 
 ## Visão geral
 
 ```text
-Navegador ──HTTPS──▶ Vercel (Next.js: páginas, Server Actions, /auth/callback)
+Navegador ──HTTPS──▶ Render (Next.js: páginas, Server Actions, /auth/callback)
     │                        │
     │                        └──▶ Supabase (PostgreSQL com RLS + Auth)
     └── login ──▶ Google ──▶ Supabase Auth ──▶ /auth/callback
@@ -17,11 +17,11 @@ Navegador ──HTTPS──▶ Vercel (Next.js: páginas, Server Actions, /auth/
 
 | Onde | Variáveis | Observação |
 |---|---|---|
-| Vercel | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_SITE_URL` | Únicas variáveis da aplicação. São públicas por natureza (a RLS protege os dados). |
-| Sua máquina, só para o seed | `DATABASE_URL` | Connection string do Postgres. **Nunca** configure na Vercel. |
-| Supabase Dashboard | Client ID e Secret do Google | Ficam no Supabase, não na aplicação. |
+| Render | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_SITE_URL` | Variáveis públicas da aplicação. A RLS protege os dados. |
+| Sua máquina, só para o seed | `DATABASE_URL` | String de conexão do Postgres. |
+| Supabase Dashboard | Client ID e Client Secret do Google | Credenciais do provedor de login. |
 
-> A chave `service_role`/secret do Supabase **não é usada pela aplicação**. Ela só aparece no `.env.local` para os testes de integração locais. Não a coloque na Vercel.
+> Reserve `SUPABASE_SECRET_KEY` para os testes de integração locais.
 
 ---
 
@@ -69,7 +69,7 @@ Navegador ──HTTPS──▶ Vercel (Next.js: páginas, Server Actions, /auth/
    - Enquanto o app estiver em modo **Testing**, adicione sua conta Google em **Test users**. Para uso pessoal, não é preciso publicar o app.
 3. **APIs & Services → Credentials → Create credentials → OAuth client ID**:
    - Tipo: **Web application**.
-   - **Authorized JavaScript origins**: a URL da aplicação, por exemplo `https://guie-se.vercel.app`.
+   - Em **Authorized JavaScript origins**, informe a URL pública da aplicação, por exemplo `https://guie-se.onrender.com`.
    - **Authorized redirect URIs**: a URL de callback **do Supabase** (não a da aplicação):
 
      ```text
@@ -84,43 +84,50 @@ Navegador ──HTTPS──▶ Vercel (Next.js: páginas, Server Actions, /auth/
 
 1. **Authentication → Sign In / Providers → Google**: habilite e cole o Client ID e o Client Secret.
 2. **Authentication → URL Configuration**:
-   - **Site URL**: `https://<seu-domínio>` (produção).
+   - Em **Site URL**, informe a URL pública do serviço, por exemplo `https://guie-se.onrender.com`.
    - **Redirect URLs**, uma por linha:
 
      ```text
-     https://<seu-domínio>/auth/callback
+     https://guie-se.onrender.com/auth/callback
      http://localhost:3000/auth/callback
-     https://*-<seu-time>.vercel.app/auth/callback
      ```
 
-     A última linha cobre os deploys de preview da Vercel.
+     Substitua `guie-se.onrender.com` pelo domínio do seu serviço. A entrada `localhost` permite testar a aplicação local com o mesmo Supabase hospedado.
 
 O perfil do usuário (`public.profiles`) é criado automaticamente pelo trigger `on_auth_user_created` no primeiro login.
 
+### Cadastro por e-mail e senha
+
+Em **Authentication → Sign In / Providers**, habilite **Email** e permita novos cadastros. Com **Confirm email** ativo, o Guie-se usa as URLs `/auth/callback` acima. Mantenha o link do template **Confirm signup** apontando para `{{ .ConfirmationURL }}`. O usuário abre o link no mesmo navegador em que iniciou o cadastro. [Cadastro por e-mail no Supabase](https://supabase.com/docs/guides/auth/passwords)
+
+Para entregar e-mails de confirmação a usuários externos, configure um SMTP próprio no Supabase. [Configuração de SMTP](https://supabase.com/docs/guides/auth/auth-smtp)
+
 ---
 
-## 4. Vercel
+## 4. Render
 
-1. Importe o repositório em [vercel.com/new](https://vercel.com/new). O framework é detectado como Next.js, sem configuração extra.
-2. **Settings → Environment Variables**:
+O [Blueprint do projeto](../render.yaml) descreve o serviço Node `guie-se` no plano Free. Se o serviço já existe no Render, use as configurações abaixo no painel dele. [Blueprints do Render](https://render.com/docs/infrastructure-as-code)
 
-   | Variável | Production | Preview |
-   |---|---|---|
-   | `NEXT_PUBLIC_SUPABASE_URL` | ✔ | ✔ |
-   | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | ✔ | ✔ |
-   | `NEXT_PUBLIC_SITE_URL` | `https://<seu-domínio>` | **deixe vazio** |
+1. No painel do Render, selecione **New → Web Service** e conecte o repositório GitHub. Use **Node** como linguagem e a raiz do repositório como diretório. [Deploy de Next.js no Render](https://render.com/docs/deploy-nextjs-app)
+2. Configure os comandos **Build Command** `npm ci && npm run build` e **Start Command** `npm start`. O `next start` usa a variável `PORT` do Render. [Portas de Web Services](https://render.com/docs/web-services#port-binding)
+3. Em **Environment**, adicione as variáveis antes do build.
 
-   Sem `NEXT_PUBLIC_SITE_URL`, o preview usa o próprio host como destino do login. Com o valor de produção, o login de um preview voltaria para produção.
+   | Variável | Valor |
+   |---|---|
+   | `NEXT_PUBLIC_SUPABASE_URL` | Project URL do Supabase hospedado |
+   | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Publishable key do mesmo projeto |
+   | `NEXT_PUBLIC_SITE_URL` | URL pública do serviço, por exemplo `https://guie-se.onrender.com` |
 
-   Não configure `DATABASE_URL`, `SUPABASE_SECRET_KEY` nem `DEV_EMAIL_LOGIN`. O login por e-mail de desenvolvimento só funciona em `next dev` (`NODE_ENV=development`), mas não há motivo para expor essa variável.
+4. Faça o deploy e confira a URL atribuída pelo Render. Se precisar corrigir `NEXT_PUBLIC_SITE_URL`, use **Save, rebuild, and deploy**. Use a mesma URL nas configurações do Google Cloud e do Supabase Auth. [Variáveis de ambiente no Render](https://render.com/docs/configure-environment-variables)
 
-3. Faça o deploy. O build falha de propósito se as variáveis do Supabase estiverem ausentes (`src/lib/env.ts`).
+Se configurar **Health Check Path**, use `/login`. Aplique as migrations e carregue o roadmap no Supabase conforme a seção 1 para que o app consiga consultar os tópicos após o login.
 
 ---
 
 ## 5. Verificação pós-deploy
 
 - [ ] Abrir `https://<seu-domínio>/` sem sessão redireciona para `/login`.
+- [ ] "Criar conta" permite cadastrar e-mail e senha. Com a confirmação ativa, o link no e-mail conclui o acesso.
 - [ ] "Entrar com Google" leva à tela do Google e volta para a página inicial.
 - [ ] Em **Supabase → Table editor → profiles** aparece seu perfil.
 - [ ] Abrir um tópico e voltar à página inicial mostra "Último estudo".

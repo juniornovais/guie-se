@@ -35,20 +35,16 @@ export async function updateSession(request: NextRequest) {
   const { data } = await supabase.auth.getClaims();
   const isAuthenticated = Boolean(data?.claims?.sub);
   const { pathname, search } = request.nextUrl;
+  const origin = env.NEXT_PUBLIC_SITE_URL ?? request.nextUrl.origin;
 
   if (!isAuthenticated && !isPublicPath(pathname)) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    url.search = "";
+    const url = new URL("/login", origin);
     if (pathname !== "/") url.searchParams.set("next", pathname + search);
     return redirectWithCookies(url, response);
   }
 
   if (isAuthenticated && pathname === "/login") {
-    const url = request.nextUrl.clone();
-    url.pathname = "/";
-    url.search = "";
-    return redirectWithCookies(url, response);
+    return redirectWithCookies(new URL("/", origin), response);
   }
 
   return response;

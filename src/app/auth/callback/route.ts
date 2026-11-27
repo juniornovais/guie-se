@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { safeNextPath } from "@/lib/auth/redirect";
+import { env } from "@/lib/env";
 
 /**
  * Retorno do OAuth (Google -> Supabase Auth -> aqui).
@@ -8,7 +9,8 @@ import { safeNextPath } from "@/lib/auth/redirect";
  * automaticamente pelo trigger `on_auth_user_created` no banco.
  */
 export async function GET(request: NextRequest) {
-  const { searchParams, origin } = request.nextUrl;
+  const { searchParams } = request.nextUrl;
+  const origin = env.NEXT_PUBLIC_SITE_URL ?? request.nextUrl.origin;
   const code = searchParams.get("code");
   const next = safeNextPath(searchParams.get("next"));
 

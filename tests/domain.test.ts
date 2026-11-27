@@ -102,6 +102,7 @@ describe("safeNextPath (proteção contra open redirect)", () => {
     ["https://evil.com", "/"],
     ["//evil.com", "/"],
     ["/\\evil.com", "/"],
+    ["/\t/evil.com", "/"],
     ["/login", "/"],
     [null, "/"],
   ])("%s -> %s", (input, expected) => {

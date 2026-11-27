@@ -34,7 +34,7 @@ Uma única aplicação **Next.js 16 (App Router)**, com **Supabase** (PostgreSQL
 ## 2. Diagrama
 
 ```text
-                    ┌──────────────────────── Vercel ────────────────────────┐
+                    ┌──────────────────────── Render ────────────────────────┐
  Navegador ───────▶ │ proxy.ts  (renova sessão, exige login)                  │
    ▲   │            │   │                                                     │
    │   │ Server     │ Server Components ──▶ services/* ──┐                   │

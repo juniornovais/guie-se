@@ -12,10 +12,12 @@ const password = "senha-e2e-123";
 async function login(page: Page, who = email) {
   await page.goto("/");
   await expect(page).toHaveURL(/\/login/);
-  await page.getByText("Login de desenvolvimento").click();
-  await page.getByLabel("E-mail").fill(who);
-  await page.getByLabel("Senha").fill(password);
-  await page.getByRole("button", { name: "Entrar no ambiente local" }).click();
+  const summary = page.getByText("Login de desenvolvimento", { exact: true });
+  const devLogin = page.locator("details").filter({ has: summary });
+  await summary.click();
+  await devLogin.getByLabel("E-mail").fill(who);
+  await devLogin.getByLabel("Senha").fill(password);
+  await devLogin.getByRole("button", { name: "Entrar no ambiente local" }).click();
   await expect(page.getByRole("link", { name: /Começar a estudar|Continuar estudando/ })).toBeVisible();
 }
 

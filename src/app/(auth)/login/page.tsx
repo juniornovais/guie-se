@@ -12,7 +12,7 @@ const devLogin = process.env.NODE_ENV === "development" && process.env.DEV_EMAIL
 async function Form({ searchParams }: { searchParams: PageProps<"/login">["searchParams"] }) {
   const sp = await searchParams;
   const next = safeNextPath(typeof sp.next === "string" ? sp.next : null);
-  return <LoginForm next={next} devLogin={devLogin} />;
+  return <LoginForm next={next} devLogin={devLogin} signup={sp.mode === "signup"} />;
 }
 
 export default function LoginPage({ searchParams }: PageProps<"/login">) {
@@ -34,7 +34,7 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
           <div className="space-y-3">
             <h1 className="text-3xl font-bold leading-tight tracking-tight">Continue de onde parou</h1>
             <p className="text-muted-foreground">
-              Entre com sua conta Google para recuperar seu progresso e suas anotações em qualquer computador.
+              Acesse seu progresso e suas anotações em qualquer computador.
             </p>
           </div>
           <Suspense fallback={<div className="h-12 rounded-lg bg-accent" />}>

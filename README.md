@@ -2,7 +2,7 @@
 
 Plataforma pessoal de estudos do **Roadmap Java Backend**: 6 etapas, 24 módulos e 236 tópicos, do funcionamento da CPU ao design de sistemas distribuídos. Cada tópico tem objetivos, pré-requisitos, anotações e conclusão com um clique; alguns têm texto de estudo opcional e todos listam ideias de prática opcionais. O progresso, a sequência de dias e o tempo de estudo ficam salvos por usuário, com login Google.
 
-**Stack:** Next.js 16 (App Router, Server Components, Server Actions), TypeScript, Tailwind CSS, shadcn/ui, Supabase (PostgreSQL + Auth + RLS), Zod, React Hook Form. Hospedagem na Vercel.
+**Stack:** Next.js 16 (App Router, Server Components, Server Actions), TypeScript, Tailwind CSS, shadcn/ui, Supabase (PostgreSQL + Auth + RLS), Zod, React Hook Form. [Deploy no Render](docs/DEPLOY.md).
 
 ## Começar (ambiente local)
 

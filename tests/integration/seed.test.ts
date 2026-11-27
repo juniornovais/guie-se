@@ -4,7 +4,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Client } from "pg";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { loadEnv } from "../../scripts/lib/env";
 import { seed } from "../../scripts/seed";
 
@@ -15,13 +15,15 @@ const SECRET = process.env.SUPABASE_SECRET_KEY;
 const run = DB && /127\.0\.0\.1|localhost/.test(DB) && URL && SECRET ? describe : describe.skip;
 
 run("seed do roadmap", () => {
-  const pg = new Client({ connectionString: DB });
-  const admin = createClient(URL!, SECRET!, { auth: { persistSession: false } });
+  let pg: Client;
+  let admin: SupabaseClient;
   let userId = "";
 
   const count = async (table: string) => Number((await pg.query(`select count(*)::int as n from public.${table}`)).rows[0].n);
 
   beforeAll(async () => {
+    pg = new Client({ connectionString: DB });
+    admin = createClient(URL!, SECRET!, { auth: { persistSession: false } });
     await pg.connect();
     await seed(DB!);
     const { data, error } = await admin.auth.admin.createUser({ email: `seed-${Date.now()}@test.local`, email_confirm: true });
@@ -30,7 +32,7 @@ run("seed do roadmap", () => {
   });
   afterAll(async () => {
     if (userId) await admin.auth.admin.deleteUser(userId);
-    await pg.end();
+    await pg?.end();
   });
 
   it("carrega 6 etapas, 24 módulos e 236 tópicos, com descrições", async () => {

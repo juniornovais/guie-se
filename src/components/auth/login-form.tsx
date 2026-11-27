@@ -1,11 +1,12 @@
 "use client";
 
 import { useActionState } from "react";
+import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { devSignIn, signInWithGoogle, type AuthFormState } from "@/lib/auth/actions";
+import { devSignIn, signInWithEmail, signInWithGoogle, signUpWithEmail, type AuthFormState } from "@/lib/auth/actions";
 
 function GoogleIcon() {
   return (
@@ -18,15 +19,62 @@ function GoogleIcon() {
   );
 }
 
-export function LoginForm({ next, devLogin }: { next: string; devLogin: boolean }) {
+function EmailForm({ next, signup }: { next: string; signup: boolean }) {
+  const action = signup ? signUpWithEmail : signInWithEmail;
+  const [state, formAction, pending] = useActionState<AuthFormState, FormData>(action, undefined);
+  const alternative = new URLSearchParams();
+  if (next !== "/") alternative.set("next", next);
+  if (!signup) alternative.set("mode", "signup");
+  const query = alternative.toString();
+
+  return (
+    <div className="space-y-3">
+      <form action={formAction} className="space-y-3">
+        <input type="hidden" name="next" value={next} />
+        <div className="space-y-1.5">
+          <Label htmlFor="email">E-mail</Label>
+          <Input id="email" name="email" type="email" autoComplete="username" required />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="password">Senha</Label>
+          <Input
+            id="password"
+            name="password"
+            type="password"
+            autoComplete={signup ? "new-password" : "current-password"}
+            minLength={signup ? 8 : undefined}
+            aria-describedby={signup ? "password-hint" : undefined}
+            required
+          />
+          {signup && <p id="password-hint" className="text-sm text-muted-foreground">Use pelo menos 8 caracteres.</p>}
+        </div>
+        <Button type="submit" size="lg" className="h-12 w-full gap-3 text-base" disabled={pending}>
+          {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
+          {signup ? "Criar conta" : "Entrar com e-mail"}
+        </Button>
+        {state?.error && <p role="alert" className="text-sm text-danger">{state.error}</p>}
+        {state?.message && <p role="status" className="text-sm text-muted-foreground">{state.message}</p>}
+      </form>
+      <p className="text-sm text-muted-foreground">
+        {signup ? "Já tem conta? " : "Ainda não tem conta? "}
+        <Link href={query ? `/login?${query}` : "/login"} className="font-medium text-primary underline-offset-4 hover:underline">
+          {signup ? "Entrar" : "Criar conta"}
+        </Link>
+      </p>
+    </div>
+  );
+}
+
+export function LoginForm({ next, devLogin, signup }: { next: string; devLogin: boolean; signup: boolean }) {
   const [googleState, googleAction, googlePending] = useActionState<AuthFormState, FormData>(signInWithGoogle, undefined);
   const [devState, devAction, devPending] = useActionState<AuthFormState, FormData>(devSignIn, undefined);
 
   return (
     <div className="space-y-6">
+      <EmailForm key={signup ? "signup" : "login"} next={next} signup={signup} />
       <form action={googleAction} className="space-y-3">
         <input type="hidden" name="next" value={next} />
-        <Button type="submit" size="lg" className="h-12 w-full gap-3 text-base" disabled={googlePending}>
+        <Button type="submit" variant="outline" size="lg" className="h-12 w-full gap-3 text-base" disabled={googlePending}>
           {googlePending ? <Loader2 className="size-[18px] animate-spin" aria-hidden /> : <GoogleIcon />}
           Entrar com Google
         </Button>

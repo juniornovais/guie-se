@@ -6,7 +6,10 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { safeNextPath } from "./redirect";
 
-export type AuthFormState = { error?: string } | undefined;
+export type AuthFormState = { error?: string; message?: string } | undefined;
+
+const EmailLogin = z.object({ email: z.email(), password: z.string().min(1) });
+const EmailSignup = EmailLogin.extend({ password: z.string().min(8) });
 
 async function siteOrigin() {
   if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "");
@@ -16,6 +19,12 @@ async function siteOrigin() {
   return `${proto}://${host}`;
 }
 
+async function authCallbackUrl(next: string) {
+  const url = new URL("/auth/callback", await siteOrigin());
+  url.searchParams.set("next", next);
+  return url.toString();
+}
+
 /** Inicia o fluxo OAuth com Google (PKCE). */
 export async function signInWithGoogle(_prev: AuthFormState, formData: FormData): Promise<AuthFormState> {
   const next = safeNextPath(formData.get("next")?.toString());
@@ -23,7 +32,7 @@ export async function signInWithGoogle(_prev: AuthFormState, formData: FormData)
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: `${await siteOrigin()}/auth/callback?next=${encodeURIComponent(next)}`,
+      redirectTo: await authCallbackUrl(next),
       queryParams: { prompt: "select_account" },
     },
   });
@@ -36,6 +45,53 @@ export async function signInWithGoogle(_prev: AuthFormState, formData: FormData)
     };
   }
   redirect(data.url);
+}
+
+export async function signInWithEmail(_prev: AuthFormState, formData: FormData): Promise<AuthFormState> {
+  const parsed = EmailLogin.safeParse({ email: formData.get("email"), password: formData.get("password") });
+  if (!parsed.success) return { error: "Informe um e-mail válido e sua senha." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signInWithPassword(parsed.data);
+  switch (error?.code) {
+    case "invalid_credentials":
+      return { error: "E-mail ou senha incorretos." };
+    case "email_not_confirmed":
+      return { error: "Confirme seu e-mail antes de entrar. Confira também a pasta de spam." };
+    case "over_request_rate_limit":
+      return { error: "Muitas tentativas. Aguarde um pouco e tente novamente." };
+  }
+  if (error) return { error: "Não foi possível entrar. Tente novamente." };
+
+  redirect(safeNextPath(formData.get("next")?.toString()));
+}
+
+export async function signUpWithEmail(_prev: AuthFormState, formData: FormData): Promise<AuthFormState> {
+  const parsed = EmailSignup.safeParse({ email: formData.get("email"), password: formData.get("password") });
+  if (!parsed.success) return { error: "Informe um e-mail válido e uma senha com pelo menos 8 caracteres." };
+
+  const next = safeNextPath(formData.get("next")?.toString());
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.signUp({
+    ...parsed.data,
+    options: { emailRedirectTo: await authCallbackUrl(next) },
+  });
+  switch (error?.code) {
+    case "email_provider_disabled":
+    case "signup_disabled":
+      return { error: "O cadastro por e-mail está indisponível no momento." };
+    case "weak_password":
+      return { error: "Escolha uma senha mais forte." };
+    case "over_email_send_rate_limit":
+    case "over_request_rate_limit":
+      return { error: "Aguarde um pouco antes de tentar criar a conta novamente." };
+  }
+  if (error && error.code !== "user_already_exists") {
+    return { error: "Não foi possível concluir o cadastro. Tente novamente." };
+  }
+  if (data.session) redirect(next);
+
+  return { message: "Confira seu e-mail. Abra o link de confirmação neste mesmo navegador. Se já tiver uma conta, volte para entrar." };
 }
 
 export async function signOut() {

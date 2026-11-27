@@ -17,7 +17,7 @@ const isLocal = !!URL && /127\.0\.0\.1|localhost/.test(URL);
 const run = isLocal && PUBLISHABLE && SECRET ? describe : describe.skip;
 
 run("RLS — isolamento entre usuários", () => {
-  const admin = createClient(URL!, SECRET!, { auth: { persistSession: false } });
+  let admin: SupabaseClient;
   const stamp = Date.now();
   const users: { id: string; client: SupabaseClient }[] = [];
   let topicId = "";
@@ -39,6 +39,7 @@ run("RLS — isolamento entre usuários", () => {
   }
 
   beforeAll(async () => {
+    admin = createClient(URL!, SECRET!, { auth: { persistSession: false } });
     users.push(await makeUser("a"), await makeUser("b"));
     const { data } = await users[0].client.from("topics").select("id").eq("key", "4.1.8").single();
     topicId = data!.id;
