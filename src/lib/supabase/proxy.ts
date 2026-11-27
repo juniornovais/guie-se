@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { configuredSiteOrigin } from "@/lib/auth/site-origin";
 import { env } from "@/lib/env";
 
 /** Rotas acessíveis sem login. Todo o resto exige sessão. */
@@ -35,7 +36,7 @@ export async function updateSession(request: NextRequest) {
   const { data } = await supabase.auth.getClaims();
   const isAuthenticated = Boolean(data?.claims?.sub);
   const { pathname, search } = request.nextUrl;
-  const origin = env.NEXT_PUBLIC_SITE_URL ?? request.nextUrl.origin;
+  const origin = configuredSiteOrigin() ?? request.nextUrl.origin;
 
   if (!isAuthenticated && !isPublicPath(pathname)) {
     const url = new URL("/login", origin);

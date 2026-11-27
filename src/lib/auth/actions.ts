@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { safeNextPath } from "./redirect";
+import { configuredSiteOrigin } from "./site-origin";
 
 export type AuthFormState = { error?: string; message?: string } | undefined;
 
@@ -12,7 +13,8 @@ const EmailLogin = z.object({ email: z.email(), password: z.string().min(1) });
 const EmailSignup = EmailLogin.extend({ password: z.string().min(8) });
 
 async function siteOrigin() {
-  if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "");
+  const configuredOrigin = configuredSiteOrigin();
+  if (configuredOrigin) return configuredOrigin;
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host");
   const proto = h.get("x-forwarded-proto") ?? "http";
