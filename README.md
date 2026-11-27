@@ -55,18 +55,4 @@ src/
 tests/                   unitários, integração (RLS, seed) e e2e
 ```
 
-## Documentação
 
-- [Arquitetura](docs/ARQUITETURA.md): decisões, modelo de dados, RLS, fluxos de autenticação e persistência.
-- [Configuração e publicação](docs/DEPLOY.md): Supabase, Google OAuth, Vercel, migrations, seed e backup.
-- [Inventário do roadmap](docs/INVENTARIO.md): todas as etapas, módulos, tópicos, objetivos, pré-requisitos, desafios planejados e critérios.
-
-## Situação do conteúdo
-
-| Conteúdo | Cobertura |
-|---|---|
-| Etapas, módulos, tópicos e ordem (roadmap oficial) | 236 de 236 |
-| Objetivos, pré-requisitos e ideias de prática (opcionais) | 236 de 236 |
-| Texto de estudo (leitura opcional) | 18 de 236: Etapa 01 Fundamentos |
-
-Concluir um tópico é um clique: não depende de leitura nem de desafios. Os arquivos `challenges.md` da Etapa 01 continuam no repositório e no banco, mas não aparecem na interface.
