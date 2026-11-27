@@ -6,7 +6,7 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { devSignIn, signInWithEmail, signInWithGoogle, signUpWithEmail, type AuthFormState } from "@/lib/auth/actions";
+import { devSignIn, resendEmailConfirmation, signInWithEmail, signInWithGoogle, signUpWithEmail, type AuthFormState } from "@/lib/auth/actions";
 
 function GoogleIcon() {
   return (
@@ -55,6 +55,9 @@ function EmailForm({ next, signup }: { next: string; signup: boolean }) {
         {state?.error && <p role="alert" className="text-sm text-danger">{state.error}</p>}
         {state?.message && <p role="status" className="text-sm text-muted-foreground">{state.message}</p>}
       </form>
+      {state?.confirmationEmail && (
+        <ResendConfirmationForm key={state.confirmationEmail} email={state.confirmationEmail} next={next} />
+      )}
       <p className="text-sm text-muted-foreground">
         {signup ? "Já tem conta? " : "Ainda não tem conta? "}
         <Link href={query ? `/login?${query}` : "/login"} className="font-medium text-primary underline-offset-4 hover:underline">
@@ -62,6 +65,22 @@ function EmailForm({ next, signup }: { next: string; signup: boolean }) {
         </Link>
       </p>
     </div>
+  );
+}
+
+function ResendConfirmationForm({ email, next }: { email: string; next: string }) {
+  const [state, action, pending] = useActionState(resendEmailConfirmation, undefined);
+
+  return (
+    <form action={action} className="space-y-2">
+      <input type="hidden" name="email" value={email} />
+      <input type="hidden" name="next" value={next} />
+      <Button type="submit" variant="outline" disabled={pending}>
+        {pending ? "Solicitando link…" : "Reenviar confirmação"}
+      </Button>
+      {state?.error && <p role="alert" className="text-sm text-danger">{state.error}</p>}
+      {state?.message && <p role="status" className="text-sm text-muted-foreground">{state.message}</p>}
+    </form>
   );
 }
 

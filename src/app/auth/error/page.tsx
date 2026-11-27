@@ -7,7 +7,7 @@ const MESSAGES: Record<string, string> = {
   missing_code: "O retorno do login chegou sem o código de autorização.",
   bad_code_verifier: "A sessão de login expirou ou foi aberta em outro navegador. Inicie o login novamente.",
   flow_state_not_found: "A sessão de login expirou. Inicie o login novamente.",
-  otp_expired: "O link de confirmação expirou ou já foi usado. Volte para entrar ou solicitar outro link ao criar a conta.",
+  otp_expired: "O link de confirmação expirou ou já foi usado. Entre com e-mail e senha para solicitar outro link se a conta ainda estiver pendente.",
 };
 
 async function Reason({ searchParams }: { searchParams: PageProps<"/auth/error">["searchParams"] }) {

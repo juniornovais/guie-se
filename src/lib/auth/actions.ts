@@ -3,14 +3,27 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import type { AuthError } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { safeNextPath } from "./redirect";
 import { configuredSiteOrigin } from "./site-origin";
 
-export type AuthFormState = { error?: string; message?: string } | undefined;
+export type AuthFormState = { error?: string; message?: string; confirmationEmail?: string } | undefined;
 
-const EmailLogin = z.object({ email: z.email(), password: z.string().min(1) });
+const Email = z.email();
+const EmailLogin = z.object({ email: Email, password: z.string().min(1) });
 const EmailSignup = EmailLogin.extend({ password: z.string().min(8) });
+
+function confirmationDeliveryError(error: AuthError | null) {
+  switch (error?.code) {
+    case "over_email_send_rate_limit":
+      return "O envio de e-mails de confirmação atingiu o limite. Confira a caixa de entrada e o spam ou tente mais tarde.";
+    case "over_request_rate_limit":
+      return "Muitas tentativas em pouco tempo. Aguarde alguns minutos e tente novamente.";
+    case "email_address_not_authorized":
+      return "O serviço de e-mail ainda não pode enviar confirmações para este endereço. Tente entrar com Google.";
+  }
+}
 
 async function siteOrigin() {
   const configuredOrigin = configuredSiteOrigin();
@@ -59,7 +72,7 @@ export async function signInWithEmail(_prev: AuthFormState, formData: FormData):
     case "invalid_credentials":
       return { error: "E-mail ou senha incorretos." };
     case "email_not_confirmed":
-      return { error: "Confirme seu e-mail antes de entrar. Confira também a pasta de spam." };
+      return { error: "Confirme seu e-mail antes de entrar. Confira também a pasta de spam.", confirmationEmail: parsed.data.email };
     case "over_request_rate_limit":
       return { error: "Muitas tentativas. Aguarde um pouco e tente novamente." };
   }
@@ -78,15 +91,14 @@ export async function signUpWithEmail(_prev: AuthFormState, formData: FormData):
     ...parsed.data,
     options: { emailRedirectTo: await authCallbackUrl(next) },
   });
+  const deliveryError = confirmationDeliveryError(error);
+  if (deliveryError) return { error: deliveryError };
   switch (error?.code) {
     case "email_provider_disabled":
     case "signup_disabled":
       return { error: "O cadastro por e-mail está indisponível no momento." };
     case "weak_password":
       return { error: "Escolha uma senha mais forte." };
-    case "over_email_send_rate_limit":
-    case "over_request_rate_limit":
-      return { error: "Aguarde um pouco antes de tentar criar a conta novamente." };
   }
   if (error && error.code !== "user_already_exists") {
     return { error: "Não foi possível concluir o cadastro. Tente novamente." };
@@ -94,6 +106,22 @@ export async function signUpWithEmail(_prev: AuthFormState, formData: FormData):
   if (data.session) redirect(next);
 
   return { message: "Confira seu e-mail. Abra o link de confirmação neste mesmo navegador. Se já tiver uma conta, volte para entrar." };
+}
+
+export async function resendEmailConfirmation(_prev: AuthFormState, formData: FormData): Promise<AuthFormState> {
+  const email = Email.safeParse(formData.get("email"));
+  if (!email.success) return { error: "Informe um e-mail válido para solicitar outro link." };
+
+  const next = safeNextPath(formData.get("next")?.toString());
+  const supabase = await createClient();
+  const { error } = await supabase.auth.resend({
+    type: "signup",
+    email: email.data,
+    options: { emailRedirectTo: await authCallbackUrl(next) },
+  });
+  if (error) return { error: confirmationDeliveryError(error) ?? "Não foi possível solicitar outro link. Tente novamente." };
+
+  return { message: "Se houver uma conta aguardando confirmação, você receberá um novo link. Abra-o neste mesmo navegador." };
 }
 
 export async function signOut() {

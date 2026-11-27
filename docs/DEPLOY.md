@@ -102,7 +102,7 @@ Em **Authentication → Sign In / Providers**, habilite **Email** e permita novo
 
 Se a confirmação abrir `localhost` em produção, confira o domínio em **Site URL**, **Redirect URLs** e `NEXT_PUBLIC_SITE_URL` no Render. Depois do deploy, teste com um novo cadastro iniciado no site público. Se o clique anterior já confirmou o endereço, entre com e-mail e senha pelo site público. [URLs de redirecionamento no Supabase](https://supabase.com/docs/guides/auth/redirect-urls)
 
-Para entregar e-mails de confirmação a usuários externos, configure um SMTP próprio no Supabase. [Configuração de SMTP](https://supabase.com/docs/guides/auth/auth-smtp)
+O SMTP padrão do Supabase envia até dois e-mails de autenticação por hora por projeto e atende apenas endereços da equipe. Configure um provedor em **Authentication → Emails → SMTP Settings** para receber cadastros externos. Em **Authentication → Rate Limits**, confira o limite de envio do projeto. Para distinguir um limite de envio de um bloqueio de requisições, consulte o código do erro nos logs de Auth. [Configuração de SMTP](https://supabase.com/docs/guides/auth/auth-smtp) · [Limites de requisições](https://supabase.com/docs/guides/auth/rate-limits)
 
 ---
 
@@ -121,6 +121,8 @@ O [Blueprint do projeto](../render.yaml) descreve o serviço Node `guie-se` no p
    | `NEXT_PUBLIC_SITE_URL` | URL pública do serviço, por exemplo `https://guie-se.onrender.com`. Se estiver ausente ou apontar para localhost, a aplicação usa `RENDER_EXTERNAL_URL` no Render. |
 
 4. Faça o deploy e confira a URL atribuída pelo Render. Se precisar corrigir `NEXT_PUBLIC_SITE_URL`, use **Save, rebuild, and deploy**. Use a mesma URL nas configurações do Google Cloud e do Supabase Auth. [Variáveis de ambiente no Render](https://render.com/docs/configure-environment-variables)
+
+O Next.js usa `RENDER_GIT_COMMIT` para identificar a versão do site. Se aparecer `Failed to find Server Action` depois de um deploy, recarregue a aba de login e envie o formulário novamente. [Identificador de deploy no Next.js](https://nextjs.org/docs/app/api-reference/config/next-config-js/deploymentId)
 
 Se configurar **Health Check Path**, use `/login`. Aplique as migrations e carregue o roadmap no Supabase conforme a seção 1 para que o app consiga consultar os tópicos após o login.
 
