@@ -1,0 +1,513 @@
+{
+  "stage": "01",
+  "modules": {
+    "1.1": {
+      "description": "Explica como um programa sai do código-fonte e vira instruções executadas pela CPU, passando pela cadeia de compilação (preprocessing, compiling, assembling e linking). Cobre o modelo de memória que o programa enxerga — endereços, stack, heap e call stack — e os custos de cada região. É a base para entender, mais adiante, a JVM, o JIT, o Garbage Collector e erros como StackOverflowError e OutOfMemoryError.",
+      "objectives": [
+        "Descrever o ciclo fetch-decode-execute e relacionar registradores, cache e RAM com o desempenho de um programa",
+        "Explicar cada fase da cadeia de build (preprocessing, compiling, assembling, linking) e o artefato que ela produz",
+        "Diferenciar compilação ahead-of-time, interpretação e JIT, situando o modelo da JVM",
+        "Comparar stack e heap em custo de alocação, tempo de vida e gerenciamento",
+        "Ler e interpretar um stack trace a partir do funcionamento da call stack"
+      ]
+    },
+    "1.2": {
+      "description": "Apresenta o sistema operacional como gerenciador de CPU, memória e dispositivos, e as abstrações que ele oferece aos programas: processos, threads, address space e memória virtual. Aborda o custo real de context switches, o funcionamento de paging e o caminho de uma operação de I/O até o hardware. Esses conceitos explicam o comportamento de servidores Java sob carga, de thread pools, de virtual threads e de containers com limites de memória.",
+      "objectives": [
+        "Explicar a separação entre user mode e kernel mode e o papel das system calls",
+        "Comparar processos e threads em isolamento, custo de criação, comunicação e falhas",
+        "Estimar o impacto de context switches e de excesso de threads no throughput de um servidor",
+        "Descrever como memória virtual, page tables, TLB e page faults funcionam juntos",
+        "Diferenciar I/O bloqueante e não bloqueante e relacionar isso ao modelo de concorrência de servidores backend"
+      ]
+    }
+  },
+  "topics": {
+    "1.1.1": {
+      "summary": "Como a CPU executa instruções pelo ciclo fetch-decode-execute, usando registradores, ALU, pipeline e hierarquia de cache. Entender esse modelo explica por que localidade de dados, branches e cache misses dominam o desempenho real de código backend.",
+      "objectives": [
+        "Descrever o ciclo fetch-decode-execute e o papel do program counter, registradores e ALU",
+        "Explicar a hierarquia L1/L2/L3/RAM e estimar a ordem de grandeza da latência de cada nível",
+        "Explicar como pipelining e branch prediction aumentam o throughput e o que causa uma branch misprediction",
+        "Diferenciar cores físicos, hyper-threading e clock, e por que mais GHz não implica proporcionalmente mais desempenho",
+        "Relacionar localidade espacial e temporal com o desempenho de percorrer arrays versus estruturas encadeadas"
+      ],
+      "estimatedMinutes": 90,
+      "prerequisites": [],
+      "checklist": [
+        "Consigo explicar, sem consulta, o que acontece em um ciclo de instrução completo",
+        "Sei citar valores aproximados de latência de L1, L2, L3 e RAM e usar isso para justificar uma escolha de estrutura de dados",
+        "Medi experimentalmente o efeito de cache (acesso sequencial vs. aleatório) e interpretei o resultado",
+        "Consigo explicar por que um array ordenado pode ser processado mais rápido que um desordenado em um loop com if"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Descrever passo a passo o ciclo fetch-decode-execute de uma instrução ADD" },
+        { "level": 2, "type": "experiment", "title": "Medir o tempo de percorrer uma matriz por linhas vs. por colunas e explicar a diferença por cache" },
+        { "level": 3, "type": "experiment", "title": "Reproduzir o efeito de branch prediction somando elementos de um array ordenado vs. desordenado" },
+        { "level": 3, "type": "interview", "title": "Explicar por que uma LinkedList costuma ser mais lenta que um ArrayList mesmo em operações O(n) equivalentes" },
+        { "level": 4, "type": "implementation", "title": "Implementar um mini-interpretador de uma CPU fictícia com registradores, PC e 6 instruções" }
+      ]
+    },
+    "1.1.2": {
+      "summary": "O que é a RAM, como ela é organizada em bytes endereçáveis e como a CPU a acessa através do barramento e do controlador de memória. Importa porque a memória é volátil, finita e muito mais lenta que a CPU, o que molda decisões de cache, serialização e dimensionamento de heap.",
+      "objectives": [
+        "Explicar a RAM como sequência de bytes endereçáveis e diferenciar memória volátil de armazenamento persistente",
+        "Comparar latência e largura de banda da RAM com cache da CPU e com SSD/disco",
+        "Explicar o conceito de word size, alinhamento e por que leituras desalinhadas podem custar mais",
+        "Relacionar o tamanho da RAM com limites práticos de processos, como -Xmx na JVM e limites de containers",
+        "Explicar o que acontece com o sistema quando a memória física se esgota (swap, OOM killer)"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        { "key": "1.1.1", "kind": "recommended", "reason": "A RAM é entendida em relação à CPU e à hierarquia de cache" }
+      ],
+      "checklist": [
+        "Consigo explicar por que dados em RAM se perdem ao desligar e o que isso implica para persistência",
+        "Sei comparar ordens de grandeza de latência entre cache, RAM e SSD",
+        "Consigo explicar o que é alinhamento de memória com um exemplo de struct ou objeto",
+        "Sei descrever o comportamento do sistema quando um processo excede a memória disponível"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Montar uma tabela de latências cache/RAM/SSD/rede e explicar o impacto de cada salto" },
+        { "level": 2, "type": "experiment", "title": "Observar com ferramentas do SO (top, Task Manager, free) o consumo de RAM de uma aplicação Java ao alocar arrays grandes" },
+        { "level": 3, "type": "code_analysis", "title": "Calcular o tamanho em memória de um objeto Java com campos mistos considerando header e padding" },
+        { "level": 3, "type": "interview", "title": "Explicar o que acontece quando um container com limite de 512 MB roda uma JVM com -Xmx de 1 GB" },
+        { "level": 4, "type": "experiment", "title": "Medir a largura de banda de memória copiando grandes blocos de bytes e comparar com o valor nominal do hardware" }
+      ]
+    },
+    "1.1.3": {
+      "summary": "A diferença entre código-fonte legível por humanos, código intermediário (como bytecode) e código de máquina executado pela CPU. Entender essas camadas explica portabilidade, desempenho e por que a JVM executa o mesmo .class em arquiteturas diferentes.",
+      "objectives": [
+        "Diferenciar código-fonte, assembly, código de máquina e bytecode, indicando quem consome cada um",
+        "Explicar o que é uma ISA (x86-64, ARM64) e por que binários nativos não são portáveis entre arquiteturas",
+        "Explicar como o bytecode Java permite portabilidade e qual o custo disso (interpretação/JIT)",
+        "Ler um trecho simples de assembly ou de bytecode e relacioná-lo com o código-fonte original",
+        "Diferenciar linguagens compiladas, interpretadas e com JIT em termos de tempo de startup e desempenho de pico"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        { "key": "1.1.1", "kind": "recommended", "reason": "Código de máquina é o conjunto de instruções que a CPU executa" }
+      ],
+      "checklist": [
+        "Consigo explicar por que um executável Windows x86-64 não roda em um Mac ARM sem tradução",
+        "Usei javap -c para inspecionar o bytecode de uma classe e identifiquei as instruções principais",
+        "Consigo comparar startup e desempenho de pico de AOT, interpretação e JIT"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar as camadas código-fonte → bytecode → código de máquina para um Hello World em Java" },
+        { "level": 2, "type": "code_analysis", "title": "Inspecionar com javap -c o bytecode de um método com loop e mapear cada instrução para a linha Java" },
+        { "level": 2, "type": "experiment", "title": "Compilar uma função C com gcc -S e comparar o assembly gerado com -O0 e -O2" },
+        { "level": 3, "type": "interview", "title": "Responder: por que Java é ao mesmo tempo compilado e interpretado?" },
+        { "level": 4, "type": "implementation", "title": "Escrever um pequeno compilador de expressões aritméticas que gera instruções para uma máquina de pilha" }
+      ]
+    },
+    "1.1.4": {
+      "summary": "O que um compilador faz: análise léxica, sintática e semântica, geração de código intermediário e otimizações. Importa para interpretar erros de compilação, entender otimizações que mudam o código executado e diferenciar o javac do JIT da JVM.",
+      "objectives": [
+        "Descrever as fases de um compilador (lexer, parser, análise semântica, geração e otimização de código)",
+        "Diferenciar erros de compilação de erros de runtime e explicar por que tipagem estática antecipa falhas",
+        "Explicar otimizações comuns (constant folding, inlining, dead code elimination) e seus efeitos observáveis",
+        "Comparar o papel do javac (fonte → bytecode) com o do JIT (bytecode → código nativo em runtime)",
+        "Explicar o trade-off entre compilação AOT (ex.: GraalVM native-image) e JIT em startup, memória e desempenho de pico"
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        { "key": "1.1.3", "kind": "recommended", "reason": "É preciso distinguir as representações de código que o compilador transforma" }
+      ],
+      "checklist": [
+        "Consigo nomear e explicar as fases de um compilador com um exemplo de expressão",
+        "Sei explicar por que javac faz poucas otimizações e o JIT faz a maior parte",
+        "Consigo argumentar quando native-image é vantajoso para um serviço backend e quando não é"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Classificar erros de exemplo como léxicos, sintáticos, semânticos ou de runtime" },
+        { "level": 2, "type": "experiment", "title": "Observar constant folding comparando o bytecode de final static String concatenadas vs. não finais" },
+        { "level": 3, "type": "experiment", "title": "Usar -XX:+PrintCompilation para observar métodos sendo compilados pelo JIT durante um warm-up" },
+        { "level": 3, "type": "interview", "title": "Explicar por que benchmarks Java sem warm-up produzem resultados enganosos" },
+        { "level": 4, "type": "implementation", "title": "Implementar um lexer e um parser recursivo descendente para expressões com precedência de operadores" }
+      ]
+    },
+    "1.1.5": {
+      "summary": "A cadeia de build nativa: preprocessing expande macros e includes, compiling gera assembly, assembling produz object files e linking resolve símbolos em um executável ou biblioteca. Conhecer essa cadeia explica erros de linkagem, bibliotecas estáticas vs. dinâmicas e paralelos com classpath e class loading na JVM.",
+      "objectives": [
+        "Executar e explicar cada fase separadamente com gcc (-E, -S, -c e linkagem)",
+        "Explicar o conteúdo de um object file: código, dados, tabela de símbolos e relocations",
+        "Diferenciar linkagem estática e dinâmica em tamanho do binário, atualização e dependências em runtime",
+        "Diagnosticar erros de undefined reference e símbolo duplicado identificando a fase onde ocorrem",
+        "Comparar o linking nativo com a resolução tardia de classes pela JVM via classpath e class loaders"
+      ],
+      "estimatedMinutes": 90,
+      "prerequisites": [
+        { "key": "1.1.4", "kind": "required", "reason": "As fases detalhadas aqui são o desdobramento prático do processo de compilação" }
+      ],
+      "checklist": [
+        "Gerei manualmente os artefatos .i, .s, .o e o executável de um programa C e sei explicar cada um",
+        "Consigo ler a tabela de símbolos de um object file com nm ou objdump",
+        "Sei corrigir um erro de linkagem identificando o símbolo ausente",
+        "Consigo explicar o equivalente Java de um erro de linkagem (NoClassDefFoundError, NoSuchMethodError)"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Desenhar o fluxo .c → .i → .s → .o → executável indicando a ferramenta de cada etapa" },
+        { "level": 2, "type": "coding", "title": "Compilar um projeto C com dois arquivos separadamente e linká-los manualmente" },
+        { "level": 2, "type": "bug_hunt", "title": "Corrigir um build que falha com undefined reference por função declarada mas não linkada" },
+        { "level": 3, "type": "experiment", "title": "Comparar tamanho e dependências (ldd) de um binário linkado estática e dinamicamente" },
+        { "level": 3, "type": "interview", "title": "Explicar a causa de NoSuchMethodError em runtime quando o projeto compilou sem erros" },
+        { "level": 4, "type": "project", "title": "Criar uma biblioteca compartilhada própria e carregá-la de um programa principal com um Makefile" }
+      ]
+    },
+    "1.1.6": {
+      "summary": "Como cada byte da memória é identificado por um endereço, o que são ponteiros e referências e como dados multi-byte são dispostos (endianness). É a base para entender stack, heap, referências Java, NullPointerException e falhas como segmentation fault.",
+      "objectives": [
+        "Explicar endereço de memória, ponteiro e aritmética de ponteiros com exemplos em C",
+        "Diferenciar ponteiros em C de referências em Java e explicar por que Java não expõe endereços",
+        "Explicar little-endian vs. big-endian e onde isso importa (protocolos de rede, formatos binários)",
+        "Explicar a relação entre tamanho de ponteiro (32 vs. 64 bits) e espaço endereçável, incluindo compressed oops na JVM",
+        "Explicar o que é um null pointer e por que desreferenciá-lo gera segfault em C e NullPointerException em Java"
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        { "key": "1.1.2", "kind": "recommended", "reason": "Endereços identificam posições na RAM" }
+      ],
+      "checklist": [
+        "Consigo imprimir e interpretar endereços de variáveis em C",
+        "Sei explicar por que Java é passado por valor mesmo quando o valor é uma referência",
+        "Consigo converter um inteiro de 32 bits entre little-endian e big-endian manualmente",
+        "Sei explicar o ganho de memória de compressed oops"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar com um diagrama a diferença entre o valor de uma variável e o seu endereço" },
+        { "level": 2, "type": "coding", "title": "Percorrer um array em C usando aritmética de ponteiros e imprimir endereço e valor de cada elemento" },
+        { "level": 2, "type": "interview", "title": "Explicar por que reatribuir um parâmetro objeto dentro de um método Java não afeta o chamador" },
+        { "level": 3, "type": "experiment", "title": "Usar ByteBuffer em Java para observar a mesma int em BIG_ENDIAN e LITTLE_ENDIAN" },
+        { "level": 4, "type": "bug_hunt", "title": "Encontrar e corrigir um dangling pointer em um programa C que retorna endereço de variável local" }
+      ]
+    },
+    "1.1.7": {
+      "summary": "A stack como região de memória LIFO por thread, gerenciada por stack pointer e frames, onde vivem variáveis locais e endereços de retorno. Sua alocação é quase gratuita, mas o tamanho é limitado, o que explica StackOverflowError e o cuidado com recursão profunda.",
+      "objectives": [
+        "Explicar como o stack pointer avança e recua ao alocar e liberar um frame",
+        "Explicar por que a alocação na stack é tão barata e por que o tempo de vida é limitado ao escopo da função",
+        "Explicar por que cada thread tem sua própria stack e como -Xss afeta profundidade de recursão e memória total",
+        "Identificar o que fica na stack em Java (primitivos locais, referências) e o que não fica (objetos)",
+        "Explicar como escape analysis permite à JVM evitar alocações no heap em alguns casos"
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        { "key": "1.1.6", "kind": "recommended", "reason": "A stack é manipulada por endereços e pelo stack pointer" }
+      ],
+      "checklist": [
+        "Consigo desenhar a stack de um programa com três chamadas aninhadas",
+        "Provoquei um StackOverflowError e sei explicar por que ocorreu",
+        "Sei explicar o efeito de alterar -Xss em um servidor com milhares de threads",
+        "Consigo dizer onde cada variável de um método Java de exemplo é armazenada"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Desenhar os frames da stack durante a execução de três funções aninhadas" },
+        { "level": 2, "type": "experiment", "title": "Provocar um StackOverflowError controlado e ler o stack trace" },
+        { "level": 3, "type": "experiment", "title": "Medir a profundidade máxima de recursão com diferentes valores de -Xss" },
+        { "level": 3, "type": "interview", "title": "Explicar por que variáveis locais são thread-safe e objetos referenciados por elas não necessariamente" },
+        { "level": 4, "type": "implementation", "title": "Converter um algoritmo recursivo profundo em iterativo usando uma pilha explícita" }
+      ]
+    },
+    "1.1.8": {
+      "summary": "O heap como região de memória para alocação dinâmica com tempo de vida independente do escopo da função. Seu custo de alocação, fragmentação e liberação — manual em C, automática via Garbage Collector em Java — impacta latência e consumo de memória de qualquer serviço backend.",
+      "objectives": [
+        "Explicar como a alocação no heap difere da stack em custo, tempo de vida e gerenciamento, e por que isso motiva o GC",
+        "Explicar memory leak, double free e use-after-free em C e o equivalente de leak em Java (referências retidas)",
+        "Explicar fragmentação de memória e como alocadores e GCs compactadores lidam com ela",
+        "Explicar por que a JVM aloca objetos rapidamente via TLAB e bump pointer",
+        "Explicar o que causa OutOfMemoryError: Java heap space e como diagnosticar com heap dump"
+      ],
+      "estimatedMinutes": 90,
+      "prerequisites": [
+        { "key": "1.1.7", "kind": "recommended", "reason": "O heap é entendido em contraste com a stack" },
+        { "key": "1.1.6", "kind": "recommended", "reason": "Objetos no heap são acessados por ponteiros/referências" }
+      ],
+      "checklist": [
+        "Consigo justificar quando um dado precisa ir para o heap e não pode ficar na stack",
+        "Escrevi um programa C com malloc/free sem leaks verificado por ferramenta (ex.: valgrind ou sanitizer)",
+        "Provoquei um OutOfMemoryError em Java e identifiquei a causa em um heap dump",
+        "Sei explicar um memory leak em Java mesmo com Garbage Collector"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Comparar stack e heap em uma tabela de custo, tempo de vida, tamanho e responsável pela liberação" },
+        { "level": 2, "type": "bug_hunt", "title": "Encontrar memory leak e use-after-free em um programa C usando AddressSanitizer" },
+        { "level": 3, "type": "experiment", "title": "Provocar OutOfMemoryError com um cache estático sem limite e analisar o heap dump" },
+        { "level": 3, "type": "interview", "title": "Explicar por que alocar objetos em Java é barato, mas criar muitos objetos de vida curta ainda tem custo" },
+        { "level": 4, "type": "implementation", "title": "Implementar um alocador simples de bloco fixo (free list) em C e medir fragmentação" }
+      ]
+    },
+    "1.1.9": {
+      "summary": "A call stack como a sequência de frames ativos que registra quais funções chamaram quais, com seus parâmetros, locais e endereços de retorno. Dominar esse modelo é essencial para ler stack traces, depurar exceções, entender recursão e interpretar thread dumps e profilers.",
+      "objectives": [
+        "Explicar o que um stack frame contém e como o endereço de retorno permite voltar ao chamador",
+        "Descrever o fluxo de chamada e retorno, incluindo como exceções desempilham frames até um handler",
+        "Ler um stack trace Java identificando causa raiz, frames próprios vs. de bibliotecas e cláusulas Caused by",
+        "Explicar o custo de chamadas de função e como inlining pelo JIT o elimina",
+        "Interpretar um thread dump e um flame graph como fotografias da call stack"
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        { "key": "1.1.7", "kind": "required", "reason": "A call stack é a stack de frames; sem o modelo da stack não é possível entendê-la" }
+      ],
+      "checklist": [
+        "Consigo prever o stack trace de um programa com chamadas aninhadas antes de executá-lo",
+        "Sei encontrar a causa raiz em um stack trace com várias exceções encadeadas",
+        "Gerei e interpretei um thread dump (jstack) de uma aplicação em execução",
+        "Consigo explicar como uma exceção percorre a call stack até ser capturada"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Desenhar a call stack de um fatorial recursivo para n = 4 em cada momento da execução" },
+        { "level": 2, "type": "code_analysis", "title": "Ler um stack trace real de uma aplicação Spring e apontar a causa raiz e o frame do código próprio" },
+        { "level": 2, "type": "bug_hunt", "title": "Corrigir uma exceção cujo stack trace é perdido por um catch que relança sem a causa" },
+        { "level": 3, "type": "experiment", "title": "Capturar thread dumps com jstack de uma aplicação travada e identificar a thread bloqueada" },
+        { "level": 4, "type": "experiment", "title": "Gerar um flame graph com async-profiler e identificar o método mais custoso" }
+      ]
+    },
+    "1.2.1": {
+      "summary": "O sistema operacional como camada que gerencia CPU, memória, armazenamento e dispositivos, isolando programas entre si. Entender kernel, user mode, kernel mode e system calls explica o custo de operações como I/O e criação de threads e o comportamento de containers.",
+      "objectives": [
+        "Explicar as responsabilidades do kernel: escalonamento, gerenciamento de memória, sistema de arquivos, drivers e rede",
+        "Diferenciar user mode e kernel mode e explicar por que essa separação garante proteção",
+        "Explicar o que é uma system call, como ocorre a transição de modo e por que ela tem custo",
+        "Comparar kernels monolíticos e microkernels em desempenho e isolamento",
+        "Explicar como containers usam recursos do kernel (namespaces e cgroups) sem virtualizar hardware"
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        { "key": "1.1.1", "kind": "recommended", "reason": "Os modos de privilégio são um recurso da CPU que o SO utiliza" }
+      ],
+      "checklist": [
+        "Consigo listar as system calls feitas por um programa simples usando strace ou ferramenta equivalente",
+        "Sei explicar por que um programa não pode acessar diretamente o disco ou a memória de outro processo",
+        "Consigo explicar a diferença entre container e máquina virtual em termos de kernel"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Mapear quais responsabilidades do SO são acionadas ao executar um programa que lê um arquivo" },
+        { "level": 2, "type": "experiment", "title": "Rastrear com strace as system calls de um programa Java que lê um arquivo e identificar open, read e close" },
+        { "level": 3, "type": "experiment", "title": "Comparar o tempo de 1 milhão de escritas de 1 byte sem buffer vs. com BufferedOutputStream e explicar pelo custo de syscalls" },
+        { "level": 3, "type": "interview", "title": "Explicar a diferença entre container e VM e por que a JVM precisa reconhecer limites de cgroups" },
+        { "level": 4, "type": "implementation", "title": "Escrever um mini-shell em C que executa comandos usando fork, exec e wait" }
+      ]
+    },
+    "1.2.2": {
+      "summary": "O processo como programa em execução com address space próprio, recursos (file descriptors, sockets) e estado gerenciado pelo SO via PCB. É a unidade de isolamento: uma JVM é um processo, e falhas, limites de memória e sinais atuam sobre ele.",
+      "objectives": [
+        "Diferenciar programa (arquivo executável) de processo (instância em execução)",
+        "Descrever o layout de memória de um processo: text, data, BSS, heap e stack",
+        "Explicar os estados de um processo (new, ready, running, waiting, terminated) e as transições",
+        "Explicar criação de processos (fork/exec, spawn), processos zumbi e órfãos",
+        "Explicar sinais como SIGTERM e SIGKILL e sua relação com graceful shutdown de serviços Java"
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        { "key": "1.1.8", "kind": "recommended", "reason": "O layout de memória do processo inclui as regiões de heap e stack" },
+        { "key": "1.1.5", "kind": "recommended", "reason": "O processo nasce do carregamento de um executável produzido pelo linker" }
+      ],
+      "checklist": [
+        "Consigo desenhar o layout de memória de um processo e dizer onde ficam código, globais, heap e stack",
+        "Sei listar processos, ver seus recursos e encerrá-los com sinais diferentes",
+        "Implementei um shutdown hook em Java e observei a diferença entre SIGTERM e SIGKILL",
+        "Consigo explicar o que é um processo zumbi e como evitá-lo"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Desenhar o diagrama de estados de um processo e descrever o evento de cada transição" },
+        { "level": 2, "type": "experiment", "title": "Inspecionar o mapa de memória de um processo via /proc/<pid>/maps e identificar cada região" },
+        { "level": 2, "type": "coding", "title": "Iniciar e monitorar um processo filho em Java com ProcessBuilder, lendo stdout e exit code" },
+        { "level": 3, "type": "experiment", "title": "Comparar o comportamento de shutdown hooks ao enviar SIGTERM vs. SIGKILL para uma JVM" },
+        { "level": 4, "type": "bug_hunt", "title": "Diagnosticar processos zumbi gerados por um programa C que não chama wait" }
+      ]
+    },
+    "1.2.3": {
+      "summary": "A thread como unidade de execução escalonável dentro de um processo, com stack e registradores próprios mas compartilhando heap e recursos. Threads são a base da concorrência em servidores Java, e seu custo de memória e escalonamento explica thread pools e virtual threads.",
+      "objectives": [
+        "Explicar o que cada thread possui exclusivamente (stack, registradores, PC) e o que compartilha (heap, código, file descriptors)",
+        "Explicar o mapeamento 1:1 de platform threads Java para threads do SO e seu custo de memória",
+        "Explicar por que memória compartilhada gera race conditions e a necessidade de sincronização",
+        "Descrever os estados de uma thread Java (NEW, RUNNABLE, BLOCKED, WAITING, TIMED_WAITING, TERMINATED)",
+        "Explicar a motivação de thread pools e de virtual threads em servidores com muitas requisições simultâneas"
+      ],
+      "estimatedMinutes": 90,
+      "prerequisites": [
+        { "key": "1.2.2", "kind": "required", "reason": "Threads existem dentro de um processo e compartilham seus recursos" },
+        { "key": "1.1.9", "kind": "recommended", "reason": "Cada thread tem a sua própria call stack" }
+      ],
+      "checklist": [
+        "Consigo dizer, para um trecho de código, quais dados são compartilhados entre threads e quais não são",
+        "Reproduzi uma race condition em um contador e corrigi com sincronização",
+        "Sei estimar a memória consumida por milhares de platform threads",
+        "Consigo identificar estados de threads em um thread dump"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Classificar stack, heap, PC, registradores e file descriptors como próprios da thread ou compartilhados" },
+        { "level": 2, "type": "bug_hunt", "title": "Reproduzir e corrigir uma race condition em um contador incrementado por 10 threads" },
+        { "level": 3, "type": "experiment", "title": "Criar threads até falhar e observar o erro unable to create native thread e o consumo de memória" },
+        { "level": 3, "type": "experiment", "title": "Comparar o tempo e a memória de 10.000 tarefas bloqueantes com platform threads vs. virtual threads" },
+        { "level": 4, "type": "implementation", "title": "Implementar um thread pool simples com fila de tarefas e workers fixos" }
+      ]
+    },
+    "1.2.4": {
+      "summary": "Comparação entre processos e threads em isolamento, custo de criação, comunicação, consumo de memória e impacto de falhas. Essa escolha aparece em decisões reais de arquitetura, como multi-process vs. multi-thread, workers isolados e o modelo de um serviço Java em um único processo.",
+      "objectives": [
+        "Comparar processos e threads em isolamento de memória, custo de criação e custo de troca",
+        "Comparar mecanismos de comunicação: memória compartilhada entre threads vs. IPC entre processos (pipes, sockets, arquivos)",
+        "Explicar o impacto de uma falha: crash de thread vs. crash de processo",
+        "Analisar arquiteturas reais (ex.: Chrome multi-processo, Nginx workers, JVM multi-thread) e justificar suas escolhas",
+        "Escolher entre processos e threads para um cenário dado justificando por segurança, desempenho e simplicidade"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        { "key": "1.2.2", "kind": "required", "reason": "A comparação exige entender processos" },
+        { "key": "1.2.3", "kind": "required", "reason": "A comparação exige entender threads" }
+      ],
+      "checklist": [
+        "Consigo montar uma tabela comparativa com pelo menos cinco critérios",
+        "Medi o custo de criação de processos vs. threads em um experimento",
+        "Consigo justificar a arquitetura de um sistema real conhecido em termos de processos e threads"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Construir uma tabela comparativa processo vs. thread em isolamento, custo, comunicação e falhas" },
+        { "level": 2, "type": "experiment", "title": "Medir o tempo para criar 1.000 threads vs. 1.000 processos e explicar a diferença" },
+        { "level": 3, "type": "interview", "title": "Justificar por que navegadores usam um processo por aba enquanto servidores Java usam threads" },
+        { "level": 3, "type": "code_analysis", "title": "Analisar o impacto de uma exceção não tratada em uma thread de pool vs. um System.exit em um worker" },
+        { "level": 4, "type": "project", "title": "Implementar o mesmo processador de jobs com workers em threads e em processos e comparar throughput e isolamento" }
+      ]
+    },
+    "1.2.5": {
+      "summary": "O context switch como a troca da thread em execução na CPU, salvando e restaurando registradores e possivelmente trocando o address space. Seu custo direto e indireto (cache e TLB frios) limita quantas threads um servidor consegue usar com eficiência.",
+      "objectives": [
+        "Descrever o que é salvo e restaurado em um context switch e quem o dispara (timer interrupt, bloqueio em I/O, yield)",
+        "Diferenciar o custo de trocar entre threads do mesmo processo e entre processos diferentes",
+        "Explicar o custo indireto do context switch: invalidação de cache e TLB",
+        "Explicar escalonamento preemptivo vs. cooperativo e o papel do time slice",
+        "Relacionar excesso de threads com perda de throughput e justificar o dimensionamento de thread pools"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        { "key": "1.2.3", "kind": "recommended", "reason": "O context switch troca threads em execução" },
+        { "key": "1.1.1", "kind": "recommended", "reason": "O custo envolve registradores e cache da CPU" }
+      ],
+      "checklist": [
+        "Consigo explicar passo a passo o que acontece em um context switch",
+        "Medi context switches de um processo com ferramentas do SO (vmstat, pidstat ou equivalente)",
+        "Sei justificar um tamanho de thread pool para tarefas CPU-bound vs. I/O-bound"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Listar o estado salvo em um context switch e explicar por que trocar de processo custa mais" },
+        { "level": 2, "type": "experiment", "title": "Observar a taxa de context switches com vmstat enquanto uma aplicação Java cria centenas de threads" },
+        { "level": 3, "type": "experiment", "title": "Medir o throughput de uma tarefa CPU-bound com 1, N cores e 50x N cores de threads e explicar a curva" },
+        { "level": 3, "type": "interview", "title": "Responder: por que aumentar o pool de threads de 200 para 2.000 piorou a latência do serviço?" },
+        { "level": 4, "type": "implementation", "title": "Implementar um escalonador cooperativo de corrotinas simples e comparar com threads preemptivas" }
+      ]
+    },
+    "1.2.6": {
+      "summary": "A memória virtual como abstração que dá a cada processo a ilusão de uma memória contínua e exclusiva, traduzida para memória física pela MMU. Ela garante isolamento, permite overcommit e swap e explica a diferença entre memória reservada e residente de uma JVM.",
+      "objectives": [
+        "Explicar a tradução de endereço virtual para físico feita pela MMU e o papel do SO",
+        "Explicar como a memória virtual garante isolamento e proteção entre processos",
+        "Diferenciar memória virtual reservada (VSZ) de memória residente (RSS) e interpretar esses valores para uma JVM",
+        "Explicar overcommit, swap e por que swap degrada drasticamente a latência",
+        "Explicar memory-mapped files e seu uso em bancos de dados e na leitura de arquivos grandes"
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        { "key": "1.1.6", "kind": "recommended", "reason": "A memória virtual é um mapeamento entre espaços de endereços" },
+        { "key": "1.2.2", "kind": "recommended", "reason": "Cada processo tem sua própria visão de memória virtual" }
+      ],
+      "checklist": [
+        "Consigo explicar por que dois processos podem usar o mesmo endereço virtual sem conflito",
+        "Sei interpretar VSZ e RSS de uma JVM e explicar por que VSZ é muito maior",
+        "Consigo explicar o impacto de swap em um serviço com requisitos de latência"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar com um diagrama como dois processos usam o mesmo endereço virtual apontando para frames físicos diferentes" },
+        { "level": 2, "type": "experiment", "title": "Comparar VSZ e RSS de uma JVM antes e depois de tocar em um array grande alocado" },
+        { "level": 3, "type": "experiment", "title": "Ler um arquivo grande com FileChannel.map e comparar com leitura via InputStream" },
+        { "level": 3, "type": "interview", "title": "Explicar por que é recomendado desabilitar ou limitar swap em servidores de aplicação" },
+        { "level": 4, "type": "coding", "title": "Escrever um programa C que reserva 10 GB com mmap sem usá-los e explicar por que não falha" }
+      ]
+    },
+    "1.2.7": {
+      "summary": "O address space como o conjunto de endereços virtuais válidos de um processo, organizado em regiões (código, dados, heap, stack, bibliotecas, mapeamentos) com permissões próprias. Entendê-lo explica segmentation faults, ASLR e onde a JVM posiciona heap, metaspace e code cache.",
+      "objectives": [
+        "Descrever as regiões do address space e as permissões de cada uma (leitura, escrita, execução)",
+        "Explicar como o tamanho do address space em 32 vs. 64 bits limita a memória utilizável",
+        "Explicar por que acessar endereço não mapeado ou violar permissões gera segmentation fault",
+        "Explicar ASLR e o bit NX como defesas contra exploração de memória",
+        "Identificar no address space de uma JVM o heap Java, metaspace, code cache e stacks das threads"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        { "key": "1.2.6", "kind": "required", "reason": "O address space é definido sobre a memória virtual" },
+        { "key": "1.1.8", "kind": "recommended", "reason": "Heap e stack são regiões do address space" }
+      ],
+      "checklist": [
+        "Consigo ler o mapa de memória de um processo e identificar cada região e suas permissões",
+        "Sei explicar por que um processo 32 bits não usa mais que ~4 GB",
+        "Consigo explicar uma causa concreta de segmentation fault em termos de address space"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Desenhar o address space de um processo 64 bits com as regiões e suas permissões" },
+        { "level": 2, "type": "experiment", "title": "Executar o mesmo programa C várias vezes e observar a variação de endereços causada por ASLR" },
+        { "level": 2, "type": "bug_hunt", "title": "Diagnosticar um segmentation fault causado por escrita em string literal em região somente leitura" },
+        { "level": 3, "type": "experiment", "title": "Usar Native Memory Tracking (-XX:NativeMemoryTracking) para mapear as áreas de memória de uma JVM" },
+        { "level": 4, "type": "interview", "title": "Explicar por que uma JVM com -Xmx2g pode ocupar 3 GB de RSS em um container" }
+      ]
+    },
+    "1.2.8": {
+      "summary": "Paging como mecanismo que divide a memória virtual em páginas e a física em frames, traduzindo endereços via page tables e acelerando a tradução com a TLB. Page faults, huge pages e thrashing explicam picos de latência e decisões de tuning em servidores e bancos de dados.",
+      "objectives": [
+        "Explicar como um endereço virtual é dividido em número de página e offset e traduzido via page table",
+        "Explicar page tables multinível e por que existem",
+        "Explicar o papel da TLB e o impacto de TLB misses no desempenho",
+        "Diferenciar minor page fault e major page fault e estimar o custo de cada um",
+        "Explicar thrashing, huge pages e quando habilitar huge pages para a JVM ou um banco de dados"
+      ],
+      "estimatedMinutes": 90,
+      "prerequisites": [
+        { "key": "1.2.6", "kind": "required", "reason": "Paging é a implementação da memória virtual" },
+        { "key": "1.1.1", "kind": "recommended", "reason": "A TLB é um cache da CPU" }
+      ],
+      "checklist": [
+        "Consigo traduzir manualmente um endereço virtual para físico dado tamanho de página e uma page table",
+        "Sei diferenciar minor e major page faults e medi-los em um processo",
+        "Consigo explicar o que é thrashing e como identificá-lo em um servidor"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Traduzir manualmente endereços virtuais para físicos com páginas de 4 KB e uma page table dada" },
+        { "level": 2, "type": "experiment", "title": "Medir minor e major page faults de um processo com /usr/bin/time -v ou perf" },
+        { "level": 3, "type": "experiment", "title": "Comparar o tempo de inicialização de uma JVM com -XX:+AlwaysPreTouch e sem a flag e explicar pelos page faults" },
+        { "level": 3, "type": "interview", "title": "Explicar como huge pages reduzem TLB misses e quais os riscos de transparent huge pages em bancos de dados" },
+        { "level": 4, "type": "implementation", "title": "Implementar um simulador de paging com TLB e algoritmos de substituição FIFO e LRU" }
+      ]
+    },
+    "1.2.9": {
+      "summary": "Como programas realizam I/O com disco, rede e dispositivos através do SO: system calls, buffers, interrupções, DMA e page cache. A diferença entre I/O bloqueante, não bloqueante e multiplexado (epoll) é a base de modelos de servidor como thread-per-request, NIO, Netty e virtual threads.",
+      "objectives": [
+        "Descrever o caminho de uma leitura de arquivo desde a system call até o dispositivo, incluindo page cache e DMA",
+        "Explicar o papel dos buffers em user space e kernel space e o custo de cópias entre eles",
+        "Diferenciar I/O bloqueante, não bloqueante, multiplexado (select/epoll) e assíncrono",
+        "Explicar por que threads bloqueadas em I/O desperdiçam recursos e como NIO e virtual threads abordam o problema",
+        "Explicar fsync, durabilidade e por que um write bem-sucedido não garante dados no disco"
+      ],
+      "estimatedMinutes": 90,
+      "prerequisites": [
+        { "key": "1.2.1", "kind": "recommended", "reason": "I/O é realizado via system calls e drivers do kernel" },
+        { "key": "1.2.5", "kind": "recommended", "reason": "Bloqueio em I/O provoca context switches e influencia o modelo de threads" }
+      ],
+      "checklist": [
+        "Consigo explicar por que a segunda leitura de um arquivo é mais rápida que a primeira",
+        "Sei comparar o modelo thread-per-request com um event loop baseado em epoll",
+        "Implementei um servidor que atende múltiplas conexões sem uma thread por conexão",
+        "Consigo explicar quando um write está realmente durável"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Descrever o caminho completo de um read() de arquivo até o disco e de volta, incluindo page cache" },
+        { "level": 2, "type": "experiment", "title": "Medir a leitura de um arquivo grande com cache frio vs. quente e explicar pelo page cache" },
+        { "level": 2, "type": "coding", "title": "Comparar cópia de arquivo com buffers de 1 byte, 8 KB e 1 MB e explicar a curva de desempenho" },
+        { "level": 3, "type": "interview", "title": "Explicar a diferença entre I/O não bloqueante e assíncrono e onde Netty e virtual threads se encaixam" },
+        { "level": 4, "type": "project", "title": "Implementar um servidor echo TCP com Java NIO Selector e comparar com a versão thread-per-connection sob carga" }
+      ]
+    }
+  }
+}

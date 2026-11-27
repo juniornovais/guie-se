@@ -1,0 +1,3000 @@
+{
+  "stage": "04",
+  "modules": {
+    "4.1": {
+      "description": "Como a JVM transforma bytecode em código nativo e gerencia a memória do programa: carregamento de classes, interpretação e compilação JIT, áreas de memória (stacks, heap, Metaspace) e o funcionamento dos coletores de lixo. O módulo termina nos erros clássicos de memória e em como diagnosticá-los com as ferramentas do próprio JDK.",
+      "objectives": [
+        "Explicar o caminho do .java até instruções de máquina executadas pela JVM.",
+        "Descrever as áreas de memória da JVM e o que vive em cada uma.",
+        "Entender como os coletores de lixo decidem o que é lixo e quanto isso custa em pausas e throughput.",
+        "Diagnosticar memory leaks, OutOfMemoryError e StackOverflowError com jcmd, jstat, JFR, heap dumps e logs de GC.",
+        "Escolher e ajustar flags básicas da JVM (heap, coletor, logs) com base em medições."
+      ]
+    },
+    "4.2": {
+      "description": "O que o Spring e o JPA/Hibernate fazem por trás das anotações: o container IoC que cria e conecta beans, o ciclo de vida e os escopos desses beans, o caminho de uma requisição HTTP até o controller e o mapeamento objeto-relacional com Persistence Context, dirty checking e carregamento lazy. Fecha com os dois problemas mais cobrados em entrevistas: N+1 e o comportamento real de @Transactional baseado em proxies.",
+      "objectives": [
+        "Explicar como o ApplicationContext descobre, instancia, injeta e inicializa beans.",
+        "Entender como o Spring cria proxies (JDK dynamic proxy vs CGLIB) e as consequências disso.",
+        "Traçar o caminho de uma requisição pelo DispatcherServlet até a resposta.",
+        "Descrever o Persistence Context, os estados de uma entidade e o momento do flush.",
+        "Detectar e corrigir N+1 e configurar fetch adequado para cada caso de uso.",
+        "Usar @Transactional sabendo propagação, rollback e por que self-invocation não funciona."
+      ]
+    },
+    "4.3": {
+      "description": "Os conceitos de concorrência independentes de linguagem: o que significa várias threads compartilhando memória, a diferença entre concorrência e paralelismo e os problemas que surgem disso — race conditions, falta de atomicidade e de visibilidade, deadlocks. Também apresenta as primitivas clássicas de sincronização (mutex, locks, semáforos) que o módulo 4.4 mostra em Java.",
+      "objectives": [
+        "Identificar estado compartilhado mutável e as seções críticas de um código.",
+        "Explicar race condition, atomicidade e visibilidade como problemas distintos.",
+        "Escolher entre mutex, lock e semáforo conforme o problema.",
+        "Reconhecer as quatro condições de Coffman e estratégias para evitar deadlock.",
+        "Raciocinar sobre interleavings possíveis de duas ou mais threads."
+      ]
+    },
+    "4.4": {
+      "description": "Como o Java implementa concorrência: o Java Memory Model e a relação happens-before, synchronized e monitores, volatile, CAS e tipos atômicos, locks explícitos, coleções concorrentes e a infraestrutura de execução (thread pools, ExecutorService, Future, CompletableFuture). Termina nas virtual threads do Java 21, montadas sobre carrier threads, e nos seus limites como pinning.",
+      "objectives": [
+        "Explicar happens-before e por que código sem sincronização pode ver valores antigos ou reordenados.",
+        "Escolher entre synchronized, volatile, Atomic* e ReentrantLock com base em custo e semântica.",
+        "Explicar como ConcurrentHashMap e as filas bloqueantes funcionam internamente.",
+        "Dimensionar e configurar thread pools e tratar rejeição, exceções e shutdown.",
+        "Compor tarefas assíncronas com CompletableFuture sem bloquear threads indevidamente.",
+        "Saber quando virtual threads ajudam, como funcionam por baixo e o que causa pinning."
+      ]
+    }
+  },
+  "topics": {
+    "4.1.1": {
+      "summary": "O JDK contém o compilador (javac), ferramentas de diagnóstico (jcmd, jstack, javap) e a runtime; o JRE é a runtime (JVM + bibliotecas de classe); a JVM é a especificação e a implementação (HotSpot) que carrega e executa bytecode. Desde o Java 11 não existe JRE separado oficial, e o jlink gera runtimes customizados.",
+      "objectives": [
+        "Diferenciar JDK, JRE e JVM e dizer o que cada um contém.",
+        "Explicar a diferença entre a especificação da JVM e implementações como HotSpot, OpenJ9 e GraalVM.",
+        "Listar as ferramentas do JDK usadas para compilar, inspecionar e diagnosticar (javac, javap, jcmd, jstack, jstat, jfr).",
+        "Explicar por que o Java 11+ não distribui mais um JRE e como o jlink cria runtimes mínimos.",
+        "Explicar o que significa 'write once, run anywhere' e onde essa promessa tem limites (código nativo, JNI)."
+      ],
+      "estimatedMinutes": 45,
+      "prerequisites": [
+        {
+          "key": "1.1.3",
+          "kind": "recommended",
+          "reason": "Distinguir código fonte, código intermediário e código de máquina é a base para entender o papel da JVM."
+        },
+        {
+          "key": "1.1.4",
+          "kind": "recommended",
+          "reason": "Ajuda a comparar a compilação javac (para bytecode) com a compilação tradicional para código nativo."
+        }
+      ],
+      "checklist": [
+        "Explica sem consultar o que há em cada camada (JDK, JRE, JVM).",
+        "Identifica a versão e a implementação da JVM em uso com java -version e jcmd VM.version.",
+        "Gera um runtime mínimo com jlink e explica o ganho de tamanho."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Desenhar as camadas JDK, JRE e JVM com o conteúdo de cada uma"
+        },
+        {
+          "level": 1,
+          "type": "interview",
+          "title": "Explicar a um entrevistador por que o Java 11+ não tem mais JRE separado"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Inspecionar a JVM em execução com java -version, jcmd VM.version e jcmd VM.flags"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Criar com jdeps e jlink um runtime mínimo para um app e comparar o tamanho com o JDK completo"
+        },
+        {
+          "level": 4,
+          "type": "project",
+          "title": "Montar um Dockerfile multi-stage que compila com JDK e roda com runtime gerado por jlink"
+        }
+      ]
+    },
+    "4.1.2": {
+      "summary": "Bytecode é o conjunto de instruções de uma máquina virtual baseada em pilha de operandos, armazenado em arquivos .class junto com o constant pool e metadados. Entender o bytecode revela o custo real de construções como concatenação de strings, autoboxing, lambdas (invokedynamic) e chamadas virtuais.",
+      "objectives": [
+        "Descrever a estrutura de um arquivo .class (magic number, versão, constant pool, campos, métodos, atributos).",
+        "Ler a saída do javap -c e explicar instruções como iload, istore, invokevirtual, invokestatic, invokespecial e invokeinterface.",
+        "Explicar como a pilha de operandos e as variáveis locais de um frame são usadas pelas instruções.",
+        "Mostrar no bytecode o efeito de autoboxing, concatenação de strings (invokedynamic/StringConcatFactory) e lambdas.",
+        "Explicar por que o bytecode é verificado (bytecode verifier) antes da execução."
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        {
+          "key": "1.1.3",
+          "kind": "recommended",
+          "reason": "O bytecode é um código intermediário entre o fonte e o código de máquina."
+        },
+        {
+          "key": "4.1.1",
+          "kind": "recommended",
+          "reason": "É preciso saber quem gera (javac) e quem executa (JVM) o bytecode."
+        }
+      ],
+      "checklist": [
+        "Lê a saída de javap -c -v de um método simples e explica cada instrução.",
+        "Identifica no bytecode onde ocorre autoboxing e alocação implícita.",
+        "Explica a diferença entre os quatro tipos de invoke e o papel do invokedynamic.",
+        "Relaciona o número de versão do .class com UnsupportedClassVersionError."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar a estrutura de um .class e o papel do constant pool"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Desmontar com javap -c um laço com soma e anotar o estado da pilha de operandos a cada instrução"
+        },
+        {
+          "level": 2,
+          "type": "code_analysis",
+          "title": "Comparar o bytecode de Integer vs int em um loop e localizar o autoboxing"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Comparar no javap a concatenação de strings no Java 8 (StringBuilder) e no Java 9+ (invokedynamic)"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Diagnosticar um UnsupportedClassVersionError a partir do major version do .class"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Escrever um leitor mínimo de .class que imprime magic, versão e tamanho do constant pool"
+        }
+      ]
+    },
+    "4.1.3": {
+      "summary": "Classes são carregadas sob demanda por uma hierarquia de class loaders (Bootstrap, Platform, Application) que seguem o modelo de delegação ao pai, e passam por loading, linking (verificação, preparação, resolução) e inicialização. Uma classe é identificada pelo par nome + class loader, o que explica ClassCastException entre classes 'iguais' e leaks de class loaders em servidores de aplicação.",
+      "objectives": [
+        "Descrever as fases loading, linking (verification, preparation, resolution) e initialization.",
+        "Explicar a hierarquia Bootstrap, Platform e Application class loader e o modelo de delegação ao pai.",
+        "Explicar quando a inicialização de uma classe é disparada e a ordem dos blocos static.",
+        "Diferenciar ClassNotFoundException de NoClassDefFoundError e diagnosticar cada um.",
+        "Explicar por que a identidade de uma classe inclui o class loader e as consequências disso (ClassCastException, leaks em redeploy)."
+      ],
+      "estimatedMinutes": 90,
+      "prerequisites": [
+        {
+          "key": "4.1.2",
+          "kind": "recommended",
+          "reason": "O class loader carrega e verifica justamente o bytecode dos arquivos .class."
+        }
+      ],
+      "checklist": [
+        "Explica o modelo de delegação e por que ele protege classes do java.lang.",
+        "Prevê a ordem de inicialização de classes com blocos static e campos static final.",
+        "Distingue ClassNotFoundException de NoClassDefFoundError com um exemplo reproduzível.",
+        "Observa o carregamento de classes com -Xlog:class+load."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar o modelo de delegação parent-first dos class loaders"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Rodar uma aplicação com -Xlog:class+load e contar quantas classes são carregadas até o main"
+        },
+        {
+          "level": 2,
+          "type": "code_analysis",
+          "title": "Prever a ordem de execução de blocos static em uma hierarquia de classes"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Reproduzir NoClassDefFoundError causado por falha no inicializador static"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Explicar por que duas classes com o mesmo nome podem gerar ClassCastException entre si"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar um class loader customizado que carrega classes de um diretório e permite hot reload"
+        }
+      ]
+    },
+    "4.1.4": {
+      "summary": "O HotSpot começa interpretando o bytecode, coleta perfis de execução e compila os métodos quentes para código nativo com tiered compilation: C1 (rápido, poucas otimizações) e C2 (otimizações agressivas como inlining, escape analysis e loop unrolling). Otimizações especulativas podem ser desfeitas (deoptimization), o que explica warm-up e cuidados em benchmarks.",
+      "objectives": [
+        "Explicar por que a JVM combina interpretador e JIT em vez de compilar tudo antecipadamente.",
+        "Descrever os níveis da tiered compilation e o papel de C1 e C2.",
+        "Explicar inlining, escape analysis, eliminação de bounds check e OSR (on-stack replacement).",
+        "Explicar deoptimization e por que otimizações especulativas podem ser desfeitas.",
+        "Explicar por que microbenchmarks ingênuos mentem e como o JMH resolve warm-up e dead code elimination.",
+        "Comparar JIT com compilação AOT (GraalVM Native Image) em startup, pico de desempenho e memória."
+      ],
+      "estimatedMinutes": 90,
+      "prerequisites": [
+        {
+          "key": "1.1.4",
+          "kind": "recommended",
+          "reason": "Entender compilação tradicional ajuda a comparar com compilação just-in-time."
+        },
+        {
+          "key": "4.1.2",
+          "kind": "required",
+          "reason": "O JIT compila bytecode; sem entender bytecode o processo fica abstrato."
+        }
+      ],
+      "checklist": [
+        "Lê a saída de -XX:+PrintCompilation e identifica níveis de compilação, OSR (%) e 'made not entrant'.",
+        "Explica warm-up e a diferença de desempenho entre as primeiras e as últimas execuções.",
+        "Escreve um benchmark com JMH evitando dead code elimination.",
+        "Explica quando escape analysis evita uma alocação na heap."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar a tiered compilation do HotSpot: interpretador, C1 e C2"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Observar com -XX:+PrintCompilation um método quente sendo promovido de nível e compilado via OSR"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Medir o tempo de cada iteração de um laço e plotar a curva de warm-up"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Corrigir um microbenchmark ingênuo que mede código eliminado pelo JIT"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Explicar deoptimization e quando uma chamada megamórfica impede inlining"
+        },
+        {
+          "level": 4,
+          "type": "project",
+          "title": "Benchmark com JMH comparando JIT (C2) e GraalVM Native Image em startup e throughput"
+        }
+      ]
+    },
+    "4.1.5": {
+      "summary": "Cada thread Java tem sua própria JVM Stack, composta de frames criados a cada chamada de método, contendo o array de variáveis locais, a pilha de operandos e a referência ao constant pool. Primitivos locais e referências vivem no frame; os objetos apontados ficam na heap (salvo quando escape analysis elimina a alocação).",
+      "objectives": [
+        "Explicar a estrutura de um frame: variáveis locais, pilha de operandos e dados do frame.",
+        "Identificar o que fica na stack (primitivos locais, referências) e o que fica na heap (objetos).",
+        "Explicar por que cada thread tem sua própria stack e por que variáveis locais são thread-safe por natureza.",
+        "Configurar e explicar o efeito de -Xss no tamanho da stack e no número de threads.",
+        "Ler um stack trace e relacioná-lo aos frames da call stack."
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "1.1.7",
+          "kind": "required",
+          "reason": "A JVM Stack é a aplicação do conceito de stack de execução já estudado."
+        },
+        {
+          "key": "1.1.9",
+          "kind": "recommended",
+          "reason": "Frames da JVM correspondem às chamadas na call stack."
+        },
+        {
+          "key": "4.1.2",
+          "kind": "recommended",
+          "reason": "Variáveis locais e pilha de operandos aparecem diretamente nas instruções do bytecode."
+        }
+      ],
+      "checklist": [
+        "Explica a diferença entre stack e heap usando um exemplo de código Java.",
+        "Aponta, para cada variável de um trecho de código, onde ela e o objeto referenciado são armazenados.",
+        "Explica por que variáveis locais não sofrem race condition, mas os objetos que referenciam podem sofrer.",
+        "Captura e interpreta os frames de uma thread com jstack ou jcmd Thread.print."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar a diferença entre stack e heap na JVM"
+        },
+        {
+          "level": 1,
+          "type": "code_analysis",
+          "title": "Identificar onde objetos e variáveis de um método são armazenados"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Criar um programa que demonstre o comportamento da memória entre chamadas de método"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Capturar a stack de uma thread bloqueada com jstack e mapear cada frame ao código"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Medir a profundidade máxima de recursão variando -Xss e o tamanho do frame"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar um interpretador mínimo baseado em pilha de operandos para expressões aritméticas"
+        }
+      ]
+    },
+    "4.1.6": {
+      "summary": "A heap é a área compartilhada entre todas as threads onde ficam os objetos e arrays; ela é dividida em regiões/gerações conforme o coletor e cresce entre -Xms e -Xmx. Alocações são muito baratas graças a bump-the-pointer em TLABs (Thread-Local Allocation Buffers), e o layout de um objeto inclui header (mark word + class pointer), campos e padding.",
+      "objectives": [
+        "Explicar o papel da heap como área compartilhada de objetos e por que isso exige coleta de lixo.",
+        "Configurar -Xms, -Xmx e entender o comportamento da JVM em containers (MaxRAMPercentage).",
+        "Explicar como TLAB e bump-the-pointer tornam a alocação quase gratuita.",
+        "Descrever o layout de um objeto (mark word, class pointer, compressed oops, padding) e estimar seu tamanho.",
+        "Comparar o custo de memória de int[] vs Integer[] vs List<Integer>."
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        {
+          "key": "1.1.8",
+          "kind": "required",
+          "reason": "O conceito geral de heap é a base para a heap da JVM."
+        },
+        {
+          "key": "4.1.5",
+          "kind": "recommended",
+          "reason": "As referências na stack apontam para objetos na heap; os dois tópicos se complementam."
+        }
+      ],
+      "checklist": [
+        "Explica por que a heap é compartilhada e a stack não.",
+        "Estima o tamanho de um objeto e confere com JOL (Java Object Layout).",
+        "Observa o uso da heap com jstat -gc ou jcmd GC.heap_info.",
+        "Explica o que é TLAB e por que alocar é mais barato do que parece."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar o que vive na heap e por que ela é compartilhada entre threads"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Acompanhar o crescimento da heap com jstat -gc enquanto um programa aloca objetos"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Medir com JOL o layout e o tamanho de um objeto com e sem compressed oops"
+        },
+        {
+          "level": 3,
+          "type": "code_analysis",
+          "title": "Comparar o consumo de memória de int[], Integer[] e ArrayList<Integer> com 1 milhão de elementos"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Explicar como a JVM define o tamanho da heap dentro de um container Docker"
+        },
+        {
+          "level": 4,
+          "type": "project",
+          "title": "Analisar um problema de consumo excessivo de memória e reduzir o footprint de uma estrutura de dados"
+        }
+      ]
+    },
+    "4.1.7": {
+      "summary": "Metaspace é a área de memória nativa (fora da heap) que guarda metadados de classes, substituindo a PermGen a partir do Java 8. Ela cresce conforme classes são carregadas e só é liberada quando o class loader inteiro se torna inalcançável, por isso geração dinâmica de classes e redeploys são as causas típicas de OutOfMemoryError: Metaspace.",
+      "objectives": [
+        "Explicar o que é armazenado no Metaspace e o que fica na heap (instâncias, Class mirrors, strings internadas).",
+        "Explicar por que a PermGen foi substituída pelo Metaspace e quais problemas isso resolveu ou não.",
+        "Configurar MaxMetaspaceSize e MetaspaceSize e entender o efeito no gatilho de GC.",
+        "Explicar por que metadados só são liberados quando o class loader é coletado.",
+        "Identificar fontes comuns de crescimento: proxies dinâmicos, CGLIB, bibliotecas de scripting, redeploy."
+      ],
+      "estimatedMinutes": 50,
+      "prerequisites": [
+        {
+          "key": "4.1.3",
+          "kind": "required",
+          "reason": "Metaspace guarda metadados de classes carregadas e sua liberação depende dos class loaders."
+        },
+        {
+          "key": "1.2.6",
+          "kind": "recommended",
+          "reason": "Metaspace usa memória nativa reservada via memória virtual, fora da heap."
+        }
+      ],
+      "checklist": [
+        "Explica a diferença entre heap e Metaspace e o que fica em cada um.",
+        "Monitora o Metaspace com jcmd VM.metaspace ou jstat -gcmetacapacity.",
+        "Reproduz e explica um OutOfMemoryError: Metaspace."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar por que a PermGen foi substituída pelo Metaspace"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Monitorar o Metaspace com jcmd VM.metaspace durante o carregamento de muitas classes"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Provocar OutOfMemoryError: Metaspace gerando classes dinâmicas em loop com MaxMetaspaceSize baixo"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Explicar por que redeploys sucessivos em um servidor de aplicação vazam Metaspace"
+        },
+        {
+          "level": 4,
+          "type": "experiment",
+          "title": "Usar Native Memory Tracking (-XX:NativeMemoryTracking) para separar heap, Metaspace, threads e code cache"
+        }
+      ]
+    },
+    "4.1.8": {
+      "summary": "O Garbage Collector existe para recuperar automaticamente a memória de objetos da heap que não são mais alcançáveis, eliminando use-after-free e double free ao custo de CPU, memória extra e pausas. Ele determina alcançabilidade a partir dos GC Roots, explora a hipótese geracional e usa fases Stop-the-World ou concorrentes conforme o coletor (Serial, Parallel, G1, ZGC, Shenandoah).",
+      "objectives": [
+        "Entender por que existe o Garbage Collector e quais problemas da gestão manual de memória ele resolve.",
+        "Compreender a relação entre heap e coleta de lixo: alocação, alcançabilidade e recuperação de espaço.",
+        "Conhecer os conceitos de GC Roots e alcançabilidade (reachability) como critério de lixo.",
+        "Entender o funcionamento da coleta geracional (young/old, minor/major GC).",
+        "Compreender Stop-the-World e o trade-off entre latência, throughput e footprint.",
+        "Comparar os algoritmos mark-sweep, mark-compact e copying e os coletores Serial, Parallel, G1 (regions) e ZGC."
+      ],
+      "estimatedMinutes": 120,
+      "prerequisites": [
+        {
+          "key": "4.1.6",
+          "kind": "required",
+          "reason": "O GC atua sobre a heap; é preciso entender como objetos são alocados nela."
+        },
+        {
+          "key": "1.1.8",
+          "kind": "recommended",
+          "reason": "Comparar com gestão manual (malloc/free) mostra por que o GC existe."
+        }
+      ],
+      "checklist": [
+        "Explica sem consultar por que o GC existe e o critério de alcançabilidade.",
+        "Lê um log -Xlog:gc* e identifica tipo de coleta, duração da pausa e heap antes/depois.",
+        "Compara G1 e ZGC em latência e throughput e justifica a escolha para um cenário.",
+        "Explica por que System.gc() e finalize() não são formas confiáveis de gestão de memória."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar por que existe o Garbage Collector e o que significa um objeto ser lixo"
+        },
+        {
+          "level": 1,
+          "type": "interview",
+          "title": "Comparar mark-sweep, mark-compact e copying em fragmentação e custo"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Rodar um programa com -Xlog:gc* e interpretar cada linha do log de coleta"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Comparar pausas e throughput de Parallel, G1 e ZGC no mesmo workload com JFR"
+        },
+        {
+          "level": 3,
+          "type": "code_analysis",
+          "title": "Analisar um gráfico de heap em dente de serra e diagnosticar alocação excessiva"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar um coletor mark-sweep simulado sobre um grafo de objetos em Java"
+        }
+      ]
+    },
+    "4.1.9": {
+      "summary": "GC Roots são as referências que o coletor considera vivas por definição — variáveis locais e operandos nas stacks das threads, campos static de classes carregadas, referências JNI e monitores em uso. Todo objeto alcançável a partir delas sobrevive; os tipos de referência (strong, soft, weak, phantom) alteram essa regra.",
+      "objectives": [
+        "Listar os principais tipos de GC Roots na HotSpot.",
+        "Explicar a marcação por travessia do grafo a partir das raízes e por que ciclos de referência não impedem a coleta.",
+        "Diferenciar strong, soft, weak e phantom references e seus usos (caches, WeakHashMap, Cleaner).",
+        "Usar o caminho até GC Roots (path to GC roots) em um heap dump para explicar por que um objeto está vivo.",
+        "Explicar por que campos static e ThreadLocal em threads de pool são raízes perigosas."
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "4.1.8",
+          "kind": "required",
+          "reason": "GC Roots são o ponto de partida do algoritmo de marcação do GC."
+        },
+        {
+          "key": "4.1.5",
+          "kind": "recommended",
+          "reason": "Variáveis locais nas stacks das threads são a fonte mais comum de raízes."
+        }
+      ],
+      "checklist": [
+        "Lista pelo menos quatro categorias de GC Roots.",
+        "Explica por que dois objetos que se referenciam mutuamente podem ser coletados.",
+        "Encontra em um heap dump (Eclipse MAT) o caminho de um objeto até sua raiz.",
+        "Explica o comportamento de WeakReference e SoftReference sob pressão de memória."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Listar os tipos de GC Roots e explicar por que cada um é uma raiz"
+        },
+        {
+          "level": 2,
+          "type": "code_analysis",
+          "title": "Determinar quais objetos de um grafo com ciclos são alcançáveis após uma atribuição a null"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Observar uma WeakReference sendo limpa após um GC e comparar com SoftReference"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Usar 'Path to GC Roots' no Eclipse MAT para explicar por que um objeto continua vivo"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar um cache com WeakHashMap ou SoftReference e medir seu comportamento sob pressão de memória"
+        }
+      ]
+    },
+    "4.1.10": {
+      "summary": "A coleta geracional parte da hipótese de que a maioria dos objetos morre jovem: novos objetos nascem no Eden, sobreviventes passam pelos Survivor spaces e, após certa idade (tenuring threshold), são promovidos à Old Generation. Isso torna minor GCs rápidos, mas exige card tables/remembered sets para rastrear referências old→young; o G1 aplica as gerações sobre regions e o ZGC é geracional desde o Java 21.",
+      "objectives": [
+        "Explicar a weak generational hypothesis e por que ela torna a coleta mais eficiente.",
+        "Descrever o caminho de um objeto: Eden, Survivor (S0/S1), Old e o papel do tenuring threshold.",
+        "Explicar como card tables e remembered sets resolvem referências da old para a young generation.",
+        "Diferenciar minor, mixed e full GC no G1 e explicar como as regions funcionam.",
+        "Explicar premature promotion e seu efeito no aumento de coletas da old generation."
+      ],
+      "estimatedMinutes": 90,
+      "prerequisites": [
+        {
+          "key": "4.1.8",
+          "kind": "required",
+          "reason": "A coleta geracional é uma estratégia de implementação do GC."
+        },
+        {
+          "key": "4.1.9",
+          "kind": "recommended",
+          "reason": "A marcação parte das raízes e precisa considerar referências entre gerações."
+        }
+      ],
+      "checklist": [
+        "Explica a jornada de um objeto pelas gerações.",
+        "Lê jstat -gcutil e interpreta as colunas E, S0, S1, O e YGC/FGC.",
+        "Observa com -Xlog:gc+age a distribuição de idades dos objetos sobreviventes.",
+        "Explica o que é premature promotion e como reduzi-la."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar a hipótese geracional e a jornada Eden → Survivor → Old"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Acompanhar com jstat -gcutil a ocupação de Eden, Survivors e Old durante um workload"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Usar -Xlog:gc+age para observar o tenuring threshold e provocar premature promotion"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Explicar como card tables evitam varrer toda a old generation em um minor GC"
+        },
+        {
+          "level": 4,
+          "type": "project",
+          "title": "Ajustar o tamanho da young generation de um serviço e medir o efeito em frequência e duração de pausas"
+        }
+      ]
+    },
+    "4.1.11": {
+      "summary": "Stop-the-World é a suspensão de todas as threads da aplicação em um safepoint para que a JVM execute uma operação que exige uma visão consistente da heap, como fases de GC ou deoptimization. Coletores modernos (G1, ZGC, Shenandoah) movem a maior parte do trabalho para fases concorrentes usando barreiras de leitura/escrita, reduzindo pausas ao custo de throughput.",
+      "objectives": [
+        "Explicar o que é um safepoint e por que a JVM precisa parar as threads para certas operações.",
+        "Explicar quais fases de cada coletor são Stop-the-World e quais são concorrentes.",
+        "Explicar como barreiras (write barriers, load barriers, colored pointers no ZGC) permitem trabalho concorrente.",
+        "Medir pausas e time-to-safepoint com logs (-Xlog:safepoint) e JFR.",
+        "Relacionar pausas de GC com latência de cauda (p99/p999) de um serviço."
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        {
+          "key": "4.1.8",
+          "kind": "required",
+          "reason": "Pausas STW são uma propriedade dos algoritmos de coleta."
+        },
+        {
+          "key": "4.1.10",
+          "kind": "recommended",
+          "reason": "A frequência e o tipo de pausa dependem das gerações e do coletor."
+        },
+        {
+          "key": "1.2.3",
+          "kind": "recommended",
+          "reason": "STW consiste em suspender as threads da aplicação."
+        }
+      ],
+      "checklist": [
+        "Explica o que é safepoint e time-to-safepoint.",
+        "Identifica em um log de GC quais eventos pausaram a aplicação e por quanto tempo.",
+        "Explica por que o ZGC tem pausas curtas mesmo em heaps grandes.",
+        "Relaciona pausas de GC com picos de latência p99 de uma API."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar Stop-the-World e o papel dos safepoints"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Medir pausas com -Xlog:gc,safepoint em um programa com alta taxa de alocação"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Comparar a latência p99 de um endpoint HTTP com G1 e com ZGC sob carga"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Explicar como o ZGC realoca objetos concorrentemente sem parar a aplicação"
+        },
+        {
+          "level": 4,
+          "type": "project",
+          "title": "Construir um harness que correlaciona pausas de GC (JFR) com latência de requisições"
+        }
+      ]
+    },
+    "4.1.12": {
+      "summary": "Em Java, um memory leak é um objeto que continua alcançável mas nunca mais será usado — o GC não pode coletá-lo. Causas típicas são coleções static que só crescem, caches sem política de expiração, listeners não removidos, ThreadLocal em threads de pool e class loaders retidos; o diagnóstico usa heap dumps, dominator tree e retained size.",
+      "objectives": [
+        "Explicar por que memory leak em Java é diferente de leak em linguagens com gestão manual.",
+        "Reconhecer os padrões clássicos de leak (static collections, caches, listeners, ThreadLocal, inner classes não estáticas).",
+        "Gerar heap dumps com jcmd GC.heap_dump e -XX:+HeapDumpOnOutOfMemoryError.",
+        "Analisar heap dumps no Eclipse MAT usando dominator tree, retained heap e leak suspects.",
+        "Diferenciar leak de dimensionamento inadequado observando a ocupação da old generation após full GCs."
+      ],
+      "estimatedMinutes": 90,
+      "prerequisites": [
+        {
+          "key": "4.1.9",
+          "kind": "required",
+          "reason": "Um leak é um objeto inútil ainda alcançável a partir de GC Roots."
+        },
+        {
+          "key": "4.1.10",
+          "kind": "recommended",
+          "reason": "O sintoma de leak aparece como old generation crescendo após cada coleta."
+        }
+      ],
+      "checklist": [
+        "Reproduz um leak e o identifica em um heap dump.",
+        "Explica a diferença entre shallow heap e retained heap.",
+        "Distingue um leak de uma heap pequena demais pelo comportamento pós-GC.",
+        "Corrige um leak causado por ThreadLocal em thread pool."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar por que um objeto alcançável e inútil é um memory leak em Java"
+        },
+        {
+          "level": 2,
+          "type": "bug_hunt",
+          "title": "Encontrar o leak em um cache estático baseado em HashMap sem expiração"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Gerar um heap dump com jcmd e localizar o leak pela dominator tree do Eclipse MAT"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Diagnosticar um leak de ThreadLocal em threads de um pool"
+        },
+        {
+          "level": 4,
+          "type": "project",
+          "title": "Analisar um problema de consumo excessivo de memória em um serviço e documentar causa, evidências e correção"
+        }
+      ]
+    },
+    "4.1.13": {
+      "summary": "OutOfMemoryError é lançado quando a JVM não consegue satisfazer uma alocação mesmo após coletar, e a mensagem indica a área esgotada: Java heap space, GC overhead limit exceeded, Metaspace, Direct buffer memory, unable to create native thread ou Requested array size exceeds VM limit. Cada variante tem causa e diagnóstico diferentes, e após um OOM o estado da aplicação é pouco confiável.",
+      "objectives": [
+        "Diferenciar as principais mensagens de OutOfMemoryError e a área de memória de cada uma.",
+        "Configurar a JVM para gerar evidências: HeapDumpOnOutOfMemoryError, HeapDumpPath, ExitOnOutOfMemoryError.",
+        "Explicar por que capturar OutOfMemoryError e continuar é perigoso.",
+        "Diagnosticar 'unable to create native thread' relacionando com limites do SO e -Xss.",
+        "Explicar a relação entre limite de memória do container, heap e memória nativa (OOMKilled vs OOM da JVM)."
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        {
+          "key": "4.1.6",
+          "kind": "required",
+          "reason": "A variante mais comum é a heap esgotada."
+        },
+        {
+          "key": "4.1.7",
+          "kind": "recommended",
+          "reason": "OutOfMemoryError: Metaspace depende do entendimento dessa área."
+        },
+        {
+          "key": "4.1.12",
+          "kind": "recommended",
+          "reason": "Leaks são uma das causas mais frequentes de OOM."
+        }
+      ],
+      "checklist": [
+        "Reproduz pelo menos três variantes de OutOfMemoryError e explica cada causa.",
+        "Configura a JVM para gerar heap dump automaticamente em OOM.",
+        "Explica a diferença entre OutOfMemoryError da JVM e o container ser morto por OOMKilled."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Associar cada mensagem de OutOfMemoryError à área de memória esgotada"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Provocar 'Java heap space' e 'GC overhead limit exceeded' com -Xmx baixo e gerar o heap dump"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Provocar 'unable to create native thread' e relacionar com ulimit e -Xss"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Explicar por que um container é OOMKilled mesmo com -Xmx abaixo do limite"
+        },
+        {
+          "level": 4,
+          "type": "project",
+          "title": "Configurar um serviço para coletar heap dump e JFR em OOM e escrever o runbook de investigação"
+        }
+      ]
+    },
+    "4.1.14": {
+      "summary": "StackOverflowError ocorre quando a stack de uma thread não comporta mais frames, quase sempre por recursão infinita ou profunda demais. O limite depende de -Xss e do tamanho de cada frame; a JVM detecta o estouro com guard pages, e como é um Error e não uma Exception, capturá-lo raramente é apropriado.",
+      "objectives": [
+        "Explicar por que a recursão consome stack e quando ela estoura.",
+        "Relacionar o limite de profundidade com -Xss e o tamanho do frame (variáveis locais, parâmetros).",
+        "Provocar um StackOverflowError controlado e interpretar o stack trace repetitivo.",
+        "Converter algoritmos recursivos profundos em iterativos com uma pilha explícita na heap.",
+        "Reconhecer causas indiretas: toString/equals/hashCode recursivos, relacionamentos bidirecionais serializados em JSON."
+      ],
+      "estimatedMinutes": 50,
+      "prerequisites": [
+        {
+          "key": "4.1.5",
+          "kind": "required",
+          "reason": "O erro é o esgotamento da JVM Stack de uma thread."
+        },
+        {
+          "key": "1.1.9",
+          "kind": "recommended",
+          "reason": "Cada chamada empilha um frame na call stack."
+        }
+      ],
+      "checklist": [
+        "Provoca um StackOverflowError controlado e explica o stack trace.",
+        "Mede como a profundidade máxima muda com -Xss e com o tamanho do frame.",
+        "Reescreve uma recursão profunda como iteração com pilha explícita.",
+        "Identifica um StackOverflowError causado por serialização de entidades bidirecionais."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar por que recursão sem caso base gera StackOverflowError"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Provocar um StackOverflowError controlado e medir a profundidade com diferentes valores de -Xss"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Reescrever uma DFS recursiva como iterativa usando ArrayDeque"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Encontrar o StackOverflowError causado por toString recursivo entre duas classes"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Corrigir o StackOverflowError na serialização JSON de entidades com relacionamento bidirecional"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar um avaliador de expressões aninhadas que suporta profundidade arbitrária sem recursão na stack"
+        }
+      ]
+    },
+    "4.2.1": {
+      "summary": "Inversion of Control é o princípio em que o framework, e não o código da aplicação, controla a criação e a ligação dos objetos e o fluxo de execução ('Hollywood principle'). No Spring, o container IoC lê metadados (anotações, configuração Java), cria os objetos e entrega a eles suas dependências.",
+      "objectives": [
+        "Explicar Inversion of Control e o 'Hollywood principle'.",
+        "Diferenciar IoC (princípio) de Dependency Injection (uma técnica de IoC) e de Service Locator.",
+        "Explicar como IoC reduz acoplamento e facilita testes.",
+        "Comparar uma aplicação com 'new' espalhado e uma aplicação com container IoC."
+      ],
+      "estimatedMinutes": 45,
+      "prerequisites": [],
+      "checklist": [
+        "Explica IoC com um exemplo de código antes e depois.",
+        "Diferencia IoC de DI e de Service Locator.",
+        "Implementa um container IoC mínimo."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar Inversion of Control com o 'Hollywood principle'"
+        },
+        {
+          "level": 1,
+          "type": "interview",
+          "title": "Diferenciar IoC, Dependency Injection e Service Locator"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Refatorar um código com 'new' acoplado para receber dependências de fora"
+        },
+        {
+          "level": 3,
+          "type": "code_analysis",
+          "title": "Identificar pontos de acoplamento rígido que impedem testes em um serviço legado"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar um container IoC mínimo que registra e resolve dependências por tipo"
+        }
+      ]
+    },
+    "4.2.2": {
+      "summary": "Dependency Injection é a técnica em que um objeto recebe suas dependências por construtor, setter ou campo em vez de criá-las. No Spring, a resolução é por tipo com desempate por @Qualifier/@Primary, e a injeção por construtor é preferida por permitir imutabilidade, deixar dependências explícitas e falhar cedo em dependências circulares.",
+      "objectives": [
+        "Comparar injeção por construtor, setter e campo e justificar a preferência por construtor.",
+        "Explicar a resolução por tipo e o uso de @Qualifier, @Primary e injeção de List/Map de beans.",
+        "Explicar por que dependências circulares falham com injeção por construtor e por que o Spring Boot 2.6+ as proíbe por padrão.",
+        "Usar DI para substituir implementações em testes sem framework de mock.",
+        "Explicar como o Spring descobre os parâmetros do construtor por reflexão."
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "4.2.1",
+          "kind": "required",
+          "reason": "DI é a forma concreta de IoC usada pelo Spring."
+        }
+      ],
+      "checklist": [
+        "Justifica a injeção por construtor com pelo menos três argumentos.",
+        "Resolve uma ambiguidade de beans com @Qualifier ou @Primary.",
+        "Explica e corrige uma dependência circular."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Comparar injeção por construtor, setter e campo"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Resolver NoUniqueBeanDefinitionException com @Qualifier e @Primary"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Injetar uma List de estratégias e selecionar a implementação em tempo de execução"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Diagnosticar e eliminar uma dependência circular entre dois serviços"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Estender o container mínimo para injeção por construtor via reflexão"
+        }
+      ]
+    },
+    "4.2.3": {
+      "summary": "Um bean é um objeto cuja criação, configuração e ciclo de vida são gerenciados pelo container Spring, descrito internamente por um BeanDefinition. Beans são registrados por component scanning (@Component e estereótipos) ou por métodos @Bean em classes @Configuration, que são proxiadas por CGLIB para garantir singletons.",
+      "objectives": [
+        "Explicar o que é um bean e o papel do BeanDefinition.",
+        "Diferenciar @Component (e estereótipos @Service, @Repository, @Controller) de métodos @Bean.",
+        "Explicar como o component scanning encontra classes anotadas.",
+        "Explicar por que @Configuration é proxiada por CGLIB (modo full) e o que muda com proxyBeanMethods = false (lite).",
+        "Registrar beans condicionalmente (@Conditional, @Profile) como faz a autoconfiguração do Spring Boot."
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "4.2.2",
+          "kind": "recommended",
+          "reason": "Beans são os objetos que participam da injeção de dependências."
+        }
+      ],
+      "checklist": [
+        "Explica a diferença entre @Component e @Bean e quando usar cada um.",
+        "Demonstra a diferença entre @Configuration full e lite.",
+        "Lista os beans registrados em uma aplicação via ApplicationContext ou Actuator."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar o que torna um objeto um bean e o papel do BeanDefinition"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Registrar o mesmo serviço via @Component e via @Bean e comparar"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Demonstrar que chamar um método @Bean dentro de @Configuration retorna o singleton e com proxyBeanMethods=false não"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Explicar como a autoconfiguração do Spring Boot decide registrar beans com @ConditionalOnMissingBean"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Criar uma autoconfiguração própria com @Conditional para uma biblioteca interna"
+        }
+      ]
+    },
+    "4.2.4": {
+      "summary": "O ApplicationContext é o container IoC completo do Spring: estende BeanFactory com eventos, internacionalização, acesso a recursos e Environment. O método refresh() executa a sequência de inicialização — carrega BeanDefinitions, aplica BeanFactoryPostProcessors, registra BeanPostProcessors e instancia os singletons não-lazy.",
+      "objectives": [
+        "Diferenciar BeanFactory e ApplicationContext.",
+        "Descrever as etapas principais de refresh().",
+        "Explicar o papel de BeanFactoryPostProcessor e BeanPostProcessor.",
+        "Usar Environment, perfis e property sources na configuração.",
+        "Publicar e consumir eventos de aplicação (ApplicationEvent, @EventListener)."
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "4.2.3",
+          "kind": "required",
+          "reason": "O ApplicationContext é o registro e a fábrica dos beans."
+        }
+      ],
+      "checklist": [
+        "Explica as fases de refresh() em ordem.",
+        "Diferencia BeanFactoryPostProcessor de BeanPostProcessor com exemplo.",
+        "Cria um ApplicationContext manualmente sem Spring Boot."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Diferenciar BeanFactory e ApplicationContext"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Inicializar um AnnotationConfigApplicationContext manualmente e listar seus beans"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Publicar e consumir um evento de domínio com @EventListener"
+        },
+        {
+          "level": 3,
+          "type": "code_analysis",
+          "title": "Seguir no código-fonte do Spring a sequência de AbstractApplicationContext.refresh()"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar um BeanFactoryPostProcessor que altera definições de beans antes da instanciação"
+        }
+      ]
+    },
+    "4.2.5": {
+      "summary": "O ciclo de vida de um bean passa por instanciação, injeção de dependências, callbacks Aware, BeanPostProcessor (before), inicialização (@PostConstruct, InitializingBean, init-method), BeanPostProcessor (after) — onde proxies de AOP são criados — e destruição (@PreDestroy). Entender essa ordem explica por que o objeto injetado muitas vezes é um proxy e não a instância original.",
+      "objectives": [
+        "Listar a sequência completa de callbacks do ciclo de vida de um bean.",
+        "Explicar em que momento os proxies de AOP são criados (postProcessAfterInitialization).",
+        "Usar @PostConstruct e @PreDestroy corretamente e saber quando @PreDestroy não é chamado.",
+        "Explicar a diferença entre JDK dynamic proxy e CGLIB e quando cada um é usado.",
+        "Explicar por que chamar métodos de proxy dentro de @PostConstruct pode não ter o comportamento esperado."
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        {
+          "key": "4.2.4",
+          "kind": "required",
+          "reason": "O ciclo de vida é orquestrado pelo ApplicationContext e seus post-processors."
+        }
+      ],
+      "checklist": [
+        "Registra a ordem real dos callbacks com logs e explica cada um.",
+        "Mostra que o bean injetado é um proxy (getClass()) quando há AOP.",
+        "Explica JDK dynamic proxy vs CGLIB e suas limitações (interfaces, final)."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Ordenar os callbacks do ciclo de vida de um bean"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Instrumentar um bean com logs em cada callback e comparar com a ordem documentada"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Imprimir getClass() de um bean com @Transactional e identificar o proxy CGLIB"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Explicar JDK dynamic proxy vs CGLIB e por que métodos final não são interceptados"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar um BeanPostProcessor que envolve beans anotados com um proxy de medição de tempo"
+        }
+      ]
+    },
+    "4.2.6": {
+      "summary": "O escopo define quantas instâncias de um bean existem e por quanto tempo: singleton (uma por container, padrão), prototype (uma por injeção/lookup) e os escopos web request, session e application. Injetar um bean de escopo menor em um singleton exige scoped proxy ou ObjectProvider; e como singletons são compartilhados por todas as threads de requisição, estado mutável neles é um problema de concorrência (aprofundado nos módulos 4.3 e 4.4).",
+      "objectives": [
+        "Diferenciar os escopos singleton, prototype, request, session e application.",
+        "Explicar o problema de injetar prototype ou request em singleton e resolvê-lo com scoped proxy, ObjectProvider ou @Lookup.",
+        "Explicar que o Spring não gerencia a destruição de beans prototype.",
+        "Identificar estado mutável em singletons como risco quando várias requisições os usam ao mesmo tempo.",
+        "Diferenciar o singleton do Spring do padrão de projeto Singleton."
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "4.2.5",
+          "kind": "recommended",
+          "reason": "O escopo determina quando o ciclo de vida começa e termina."
+        },
+        {
+          "key": "3.5.5",
+          "kind": "recommended",
+          "reason": "O escopo session depende do conceito de sessão HTTP."
+        },
+        {
+          "key": "1.2.3",
+          "kind": "recommended",
+          "reason": "Entender que várias threads atendem requisições explica o risco de estado em singletons."
+        }
+      ],
+      "checklist": [
+        "Explica cada escopo e quando usá-lo.",
+        "Resolve a injeção de um bean prototype em singleton com ObjectProvider.",
+        "Identifica um singleton com estado mutável compartilhado entre requisições."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Comparar os escopos singleton, prototype, request e session"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Mostrar que um prototype injetado em singleton é criado uma única vez"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Corrigir a injeção de prototype com ObjectProvider e com scoped proxy"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Encontrar o bug de um controller singleton que guarda dados do usuário em campo de instância"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar um escopo customizado (por tenant) registrando um Scope no container"
+        }
+      ]
+    },
+    "4.2.7": {
+      "summary": "Uma requisição HTTP em uma aplicação Spring Boot passa pelo servidor embutido (Tomcat: conector, thread pool, parsing), pela cadeia de Servlet Filters (incluindo o Spring Security), pelo DispatcherServlet, por HandlerInterceptors, pelo controller e de volta pela serialização da resposta. Cada requisição ocupa uma thread do pool do Tomcat durante todo o processamento no modelo thread-per-request.",
+      "objectives": [
+        "Descrever o caminho de uma requisição do socket ao controller e de volta.",
+        "Explicar o modelo thread-per-request do Tomcat e o efeito do tamanho do pool (server.tomcat.threads.max).",
+        "Diferenciar Servlet Filter de HandlerInterceptor e saber onde cada um atua.",
+        "Explicar onde o Spring Security se encaixa (DelegatingFilterProxy, SecurityFilterChain).",
+        "Explicar como exceções são tratadas ao longo do caminho (@ControllerAdvice, error page)."
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "3.1.8",
+          "kind": "required",
+          "reason": "É preciso entender requisição e resposta HTTP antes do caminho interno."
+        },
+        {
+          "key": "1.2.3",
+          "kind": "recommended",
+          "reason": "Cada requisição é atendida por uma thread do pool do servidor."
+        },
+        {
+          "key": "4.2.4",
+          "kind": "recommended",
+          "reason": "Filtros, interceptors e controllers são beans do ApplicationContext."
+        }
+      ],
+      "checklist": [
+        "Desenha o caminho completo de uma requisição com todos os componentes.",
+        "Demonstra com logs a ordem entre filters, interceptors e controller.",
+        "Explica o que acontece quando o pool de threads do Tomcat se esgota."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Desenhar o caminho de uma requisição do Tomcat até o controller"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Criar um Filter e um HandlerInterceptor que registram tempo e comparar a ordem de execução"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Saturar o pool de threads do Tomcat com um endpoint lento e observar a fila com jstack"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Explicar a diferença entre Filter e HandlerInterceptor e quando usar cada um"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar propagação de correlation id do filtro até os logs via MDC"
+        }
+      ]
+    },
+    "4.2.8": {
+      "summary": "Spring MVC implementa o padrão Front Controller com o DispatcherServlet, que usa HandlerMapping para achar o handler, HandlerAdapter para invocá-lo, HandlerMethodArgumentResolvers para montar os parâmetros e HttpMessageConverters (Jackson) para serializar a resposta. Validação, tratamento de exceções e content negotiation são pontos de extensão desse pipeline.",
+      "objectives": [
+        "Explicar o papel do DispatcherServlet, HandlerMapping, HandlerAdapter e ViewResolver.",
+        "Explicar como argumentos (@PathVariable, @RequestBody, @RequestParam) são resolvidos.",
+        "Explicar como HttpMessageConverter e Jackson convertem JSON em objetos e vice-versa.",
+        "Implementar tratamento global de erros com @RestControllerAdvice e ProblemDetail.",
+        "Aplicar Bean Validation (@Valid) e entender onde ela é executada."
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        {
+          "key": "4.2.7",
+          "kind": "required",
+          "reason": "Spring MVC é a parte do caminho da requisição a partir do DispatcherServlet."
+        },
+        {
+          "key": "3.1.10",
+          "kind": "recommended",
+          "reason": "As APIs construídas com Spring MVC seguem princípios REST."
+        }
+      ],
+      "checklist": [
+        "Explica os componentes do DispatcherServlet e a ordem de atuação.",
+        "Constrói uma API REST com validação e tratamento global de erros.",
+        "Implementa um HandlerMethodArgumentResolver customizado."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar o padrão Front Controller e os componentes do DispatcherServlet"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Construir um CRUD REST com @Valid e respostas de erro em ProblemDetail"
+        },
+        {
+          "level": 3,
+          "type": "implementation",
+          "title": "Criar um HandlerMethodArgumentResolver que injeta o usuário autenticado no controller"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Diagnosticar um 415 Unsupported Media Type e um 406 Not Acceptable"
+        },
+        {
+          "level": 4,
+          "type": "project",
+          "title": "API REST de um domínio pequeno com validação, paginação, erros padronizados e testes com MockMvc"
+        }
+      ]
+    },
+    "4.2.9": {
+      "summary": "Spring Data JPA gera implementações de repositórios em tempo de execução: a interface é proxiada e os métodos são traduzidos a partir do nome (query derivation), de @Query ou de Specifications. SimpleJpaRepository delega ao EntityManager, e save() decide entre persist e merge com base em isNew().",
+      "objectives": [
+        "Explicar como Spring Data cria a implementação de uma interface Repository via proxy.",
+        "Usar query derivation, @Query (JPQL e nativa), projeções e paginação.",
+        "Explicar o comportamento de save() (persist vs merge) e o custo de isNew() com IDs atribuídos manualmente.",
+        "Explicar por que métodos de SimpleJpaRepository são transacionais por padrão.",
+        "Identificar quando uma query derivada fica ilegível e deve virar @Query ou Specification."
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "3.4.2",
+          "kind": "required",
+          "reason": "Repositórios geram SQL; é preciso ler e avaliar o SQL produzido."
+        },
+        {
+          "key": "4.2.5",
+          "kind": "recommended",
+          "reason": "O repositório é um proxy criado pelo container."
+        }
+      ],
+      "checklist": [
+        "Escreve repositórios com query derivation, @Query e paginação.",
+        "Mostra no log o SQL gerado por cada método de repositório.",
+        "Explica o SELECT extra gerado por save() com ID atribuído manualmente."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar como uma interface Repository ganha implementação em tempo de execução"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Implementar consultas por query derivation, @Query e projeção com paginação"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Habilitar o log de SQL e comparar save() de uma entidade com ID gerado e com ID atribuído"
+        },
+        {
+          "level": 3,
+          "type": "code_analysis",
+          "title": "Ler o código de SimpleJpaRepository.save() e explicar a decisão entre persist e merge"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar busca dinâmica com filtros opcionais usando Specifications"
+        }
+      ]
+    },
+    "4.2.10": {
+      "summary": "JPA (Jakarta Persistence) é a especificação de mapeamento objeto-relacional do Java: define anotações de mapeamento, o EntityManager, a JPQL e o contrato do Persistence Context, sem implementá-los. Ela resolve o descompasso objeto-relacional (identidade, herança, associações), mas abstrai o SQL de um modo que esconde custos de acesso ao banco.",
+      "objectives": [
+        "Diferenciar a especificação JPA de implementações (Hibernate, EclipseLink).",
+        "Mapear entidades com @Entity, @Id, estratégias de geração de ID e associações (@OneToMany, @ManyToOne).",
+        "Explicar o object-relational impedance mismatch.",
+        "Escrever consultas JPQL e explicar a diferença para SQL.",
+        "Explicar o lado dono (owning side) de uma associação bidirecional e o papel de mappedBy."
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        {
+          "key": "3.4.1",
+          "kind": "required",
+          "reason": "JPA mapeia objetos para o modelo relacional."
+        },
+        {
+          "key": "3.4.5",
+          "kind": "recommended",
+          "reason": "Associações JPA são implementadas com foreign keys."
+        }
+      ],
+      "checklist": [
+        "Mapeia um modelo com associações bidirecionais definindo corretamente o owning side.",
+        "Explica as estratégias de geração de ID e o impacto de IDENTITY em batch inserts.",
+        "Escreve consultas JPQL com join e explica o SQL gerado."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar o object-relational impedance mismatch e o que a JPA padroniza"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Mapear Pedido e ItensPedido com associação bidirecional e mappedBy"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Corrigir uma associação bidirecional em que o lado inverso é atualizado mas nada é salvo"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Comparar as estratégias de ID IDENTITY, SEQUENCE e UUID em desempenho e batch inserts"
+        },
+        {
+          "level": 4,
+          "type": "project",
+          "title": "Modelar com JPA um domínio de e-commerce com herança, associações e consultas JPQL"
+        }
+      ]
+    },
+    "4.2.11": {
+      "summary": "Hibernate é a implementação de JPA mais usada: implementa o Session/EntityManager, gera SQL por dialeto, gerencia o first-level cache, oferece second-level cache, batching JDBC e enhancement de bytecode. Seus recursos e configurações explicam boa parte do comportamento de desempenho de uma aplicação Spring Data JPA.",
+      "objectives": [
+        "Explicar a relação entre Session do Hibernate e EntityManager da JPA.",
+        "Explicar o papel do Dialect na geração de SQL.",
+        "Configurar e observar batching JDBC (hibernate.jdbc.batch_size, order_inserts).",
+        "Diferenciar first-level cache e second-level cache e os riscos deste último.",
+        "Usar as estatísticas do Hibernate (generate_statistics) para medir queries por requisição."
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "4.2.10",
+          "kind": "required",
+          "reason": "Hibernate é a implementação da especificação JPA."
+        },
+        {
+          "key": "3.4.11",
+          "kind": "recommended",
+          "reason": "O Hibernate obtém conexões de um pool (HikariCP) para executar o SQL."
+        }
+      ],
+      "checklist": [
+        "Explica o que o Hibernate faz além da especificação JPA.",
+        "Ativa batching e comprova pela contagem de statements.",
+        "Mede o número de queries de um caso de uso com Hibernate statistics."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar a relação entre JPA, Hibernate, Session e EntityManager"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Ativar generate_statistics e contar queries e entidades carregadas em um endpoint"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Comparar inserção de 10 mil entidades com e sem batching JDBC"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Explicar quando o second-level cache ajuda e quando gera dados desatualizados"
+        },
+        {
+          "level": 4,
+          "type": "project",
+          "title": "Otimizar um importador em lote com batching, flush/clear periódico e StatelessSession"
+        }
+      ]
+    },
+    "4.2.12": {
+      "summary": "O Persistence Context é o conjunto de entidades gerenciadas por um EntityManager, funcionando como identity map (uma instância por linha) e cache de primeiro nível. Ele guarda snapshots das entidades para o dirty checking: no flush (antes de commit, antes de queries JPQL conflitantes ou manualmente) o Hibernate compara estado atual e snapshot e emite os UPDATEs necessários.",
+      "objectives": [
+        "Explicar o Persistence Context como identity map e first-level cache.",
+        "Explicar dirty checking: snapshot, comparação no flush e geração de UPDATE.",
+        "Descrever quando o flush acontece (FlushMode AUTO, COMMIT) e a diferença entre flush e commit.",
+        "Explicar o escopo do Persistence Context em aplicações Spring (transaction-scoped) e o Open Session in View.",
+        "Explicar o custo de memória e CPU de um Persistence Context com muitas entidades e quando usar clear()."
+      ],
+      "estimatedMinutes": 90,
+      "prerequisites": [
+        {
+          "key": "4.2.11",
+          "kind": "required",
+          "reason": "O Persistence Context é implementado pela Session do Hibernate."
+        },
+        {
+          "key": "3.2.1",
+          "kind": "recommended",
+          "reason": "O flush e o commit se relacionam com a transação do banco."
+        }
+      ],
+      "checklist": [
+        "Demonstra que alterar uma entidade gerenciada gera UPDATE sem chamar save().",
+        "Explica a diferença entre flush e commit.",
+        "Demonstra que duas buscas do mesmo ID retornam a mesma instância.",
+        "Explica os riscos do Open Session in View."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar o Persistence Context como identity map e cache de primeiro nível"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Alterar uma entidade gerenciada sem chamar save() e observar o UPDATE no log"
+        },
+        {
+          "level": 2,
+          "type": "code_analysis",
+          "title": "Prever quantas queries um trecho com find() repetido e JPQL intermediária executa"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Encontrar o UPDATE inesperado causado por dirty checking em um método de leitura"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Explicar por que o Open Session in View é considerado um anti-pattern"
+        },
+        {
+          "level": 4,
+          "type": "project",
+          "title": "Processar 1 milhão de registros com flush/clear periódico e medir heap e tempo"
+        }
+      ]
+    },
+    "4.2.13": {
+      "summary": "Uma entidade JPA transita entre os estados transient (new), managed, detached e removed por meio de persist, merge, detach, remove e do fim do Persistence Context. Operações em cascata e orphanRemoval propagam essas transições, e merge copia o estado para uma instância gerenciada em vez de reanexar o objeto passado.",
+      "objectives": [
+        "Descrever os quatro estados de uma entidade e as operações que causam cada transição.",
+        "Explicar a diferença entre persist e merge e por que merge retorna outra instância.",
+        "Configurar cascade e orphanRemoval conscientemente.",
+        "Explicar a LazyInitializationException como consequência do estado detached.",
+        "Implementar equals/hashCode de entidades de forma consistente entre estados."
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "4.2.12",
+          "kind": "required",
+          "reason": "Os estados são definidos em relação ao Persistence Context."
+        }
+      ],
+      "checklist": [
+        "Desenha o diagrama de estados com todas as transições.",
+        "Demonstra que merge retorna uma instância diferente da passada.",
+        "Implementa equals/hashCode de entidade que funciona antes e depois de persistir."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Desenhar o diagrama de estados transient, managed, detached e removed"
+        },
+        {
+          "level": 2,
+          "type": "code_analysis",
+          "title": "Determinar o estado de cada entidade ao longo de um método transacional"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Corrigir alterações perdidas por usar o objeto passado ao merge em vez do retornado"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Encontrar a exclusão acidental causada por CascadeType.ALL em @ManyToOne"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar equals/hashCode de entidade estável em Set antes e depois do persist e testá-lo"
+        }
+      ]
+    },
+    "4.2.14": {
+      "summary": "Lazy loading adia o carregamento de associações até o primeiro acesso usando proxies (para @ManyToOne) e coleções persistentes (para @OneToMany); eager carrega junto com a entidade. Os padrões da JPA (ToOne eager, ToMany lazy) costumam ser ruins: o recomendado é tudo lazy e buscar o necessário por caso de uso com JOIN FETCH, @EntityGraph ou projeções.",
+      "objectives": [
+        "Explicar como o Hibernate implementa lazy loading com proxies e PersistentCollection.",
+        "Explicar os padrões de fetch da JPA e por que @ManyToOne EAGER é perigoso.",
+        "Diagnosticar e corrigir LazyInitializationException sem recorrer a Open Session in View.",
+        "Buscar associações por caso de uso com JOIN FETCH, @EntityGraph e DTO projections.",
+        "Explicar o problema do produto cartesiano ao fazer fetch de múltiplas coleções (MultipleBagFetchException)."
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "4.2.13",
+          "kind": "required",
+          "reason": "LazyInitializationException ocorre em entidades detached."
+        },
+        {
+          "key": "3.4.3",
+          "kind": "recommended",
+          "reason": "JOIN FETCH e eager loading são traduzidos em joins SQL."
+        }
+      ],
+      "checklist": [
+        "Explica como um proxy lazy é inicializado.",
+        "Corrige uma LazyInitializationException com JOIN FETCH ou @EntityGraph.",
+        "Explica por que fetch de duas coleções gera produto cartesiano."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar como o Hibernate implementa lazy loading com proxies"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Imprimir a classe de uma associação @ManyToOne LAZY antes e depois do acesso"
+        },
+        {
+          "level": 2,
+          "type": "bug_hunt",
+          "title": "Corrigir uma LazyInitializationException ao serializar uma entidade no controller"
+        },
+        {
+          "level": 3,
+          "type": "code_analysis",
+          "title": "Analisar o SQL gerado ao fazer JOIN FETCH de duas coleções e explicar a explosão de linhas"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar três casos de uso com necessidades de dados diferentes usando @EntityGraph e projeções"
+        }
+      ]
+    },
+    "4.2.15": {
+      "summary": "O problema N+1 ocorre quando uma consulta carrega N entidades e o acesso a uma associação lazy de cada uma dispara mais N consultas. As correções são JOIN FETCH/@EntityGraph, batch fetching (@BatchSize, default_batch_fetch_size), subselect ou projeções em DTO, e a detecção deve ser automatizada em testes contando queries.",
+      "objectives": [
+        "Explicar por que o N+1 surge com lazy e também com eager.",
+        "Detectar N+1 no log de SQL e com Hibernate statistics.",
+        "Corrigir com JOIN FETCH, @EntityGraph, @BatchSize e projeções e comparar trade-offs.",
+        "Explicar por que JOIN FETCH com paginação gera aviso HHH90003004 e paginação em memória.",
+        "Automatizar a detecção de N+1 com testes que afirmam o número de queries."
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        {
+          "key": "4.2.14",
+          "kind": "required",
+          "reason": "N+1 é consequência direta da estratégia de fetch das associações."
+        },
+        {
+          "key": "3.4.3",
+          "kind": "recommended",
+          "reason": "A correção principal transforma N consultas em uma consulta com join."
+        }
+      ],
+      "checklist": [
+        "Reproduz um N+1 e mede o número de queries.",
+        "Corrige com pelo menos duas técnicas e compara o SQL gerado.",
+        "Explica o problema de JOIN FETCH com paginação e a alternativa.",
+        "Escreve um teste que falha se o número de queries aumentar."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar a origem do problema N+1"
+        },
+        {
+          "level": 1,
+          "type": "interview",
+          "title": "Responder 'o que é N+1 e como você resolveria?' com mais de uma estratégia"
+        },
+        {
+          "level": 2,
+          "type": "bug_hunt",
+          "title": "Encontrar o N+1 em um endpoint que lista pedidos com seus clientes"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Comparar JOIN FETCH, @BatchSize e projeção DTO em número de queries e tempo"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Corrigir uma listagem paginada com JOIN FETCH que paginava em memória"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Criar um teste de integração que conta queries por endpoint e falha em regressões de N+1"
+        }
+      ]
+    },
+    "4.2.16": {
+      "summary": "@Transactional é implementado por um proxy (JDK dynamic proxy ou CGLIB) com TransactionInterceptor, que obtém uma transação do PlatformTransactionManager antes do método e faz commit ou rollback depois. Por isso self-invocation, métodos privados ou final ignoram a anotação; o rollback padrão só ocorre para RuntimeException e Error; e o contexto transacional fica preso à thread (ThreadLocal), não se propagando para outras threads.",
+      "objectives": [
+        "Explicar como o proxy e o TransactionInterceptor implementam @Transactional.",
+        "Explicar por que self-invocation, métodos privados e final não são transacionais e como contornar.",
+        "Explicar as regras de rollback (RuntimeException vs checked exception, rollbackFor).",
+        "Diferenciar os modos de propagação (REQUIRED, REQUIRES_NEW, NESTED, MANDATORY) e o isolamento configurável.",
+        "Explicar readOnly=true e seus efeitos no Hibernate (flush mode, dirty checking) e no driver.",
+        "Explicar que a transação está vinculada à thread via TransactionSynchronizationManager."
+      ],
+      "estimatedMinutes": 90,
+      "prerequisites": [
+        {
+          "key": "3.2.1",
+          "kind": "required",
+          "reason": "@Transactional delimita transações de banco de dados."
+        },
+        {
+          "key": "3.2.3",
+          "kind": "recommended",
+          "reason": "O atributo isolation mapeia diretamente para os níveis de isolamento."
+        },
+        {
+          "key": "4.2.5",
+          "kind": "required",
+          "reason": "O comportamento depende do proxy criado no ciclo de vida do bean."
+        },
+        {
+          "key": "4.2.12",
+          "kind": "recommended",
+          "reason": "Commit dispara o flush do Persistence Context."
+        }
+      ],
+      "checklist": [
+        "Explica o funcionamento por proxy e reproduz a falha por self-invocation.",
+        "Demonstra a diferença de rollback entre RuntimeException e checked exception.",
+        "Explica REQUIRES_NEW e o risco de consumir duas conexões do pool.",
+        "Explica o efeito de readOnly=true no Persistence Context."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar como o proxy transacional abre, confirma e desfaz transações"
+        },
+        {
+          "level": 1,
+          "type": "interview",
+          "title": "Explicar por que self-invocation quebra @Transactional"
+        },
+        {
+          "level": 2,
+          "type": "bug_hunt",
+          "title": "Encontrar por que uma checked exception não causou rollback"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Demonstrar REQUIRED vs REQUIRES_NEW registrando auditoria mesmo quando a operação principal falha"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Diagnosticar esgotamento do pool de conexões causado por REQUIRES_NEW aninhado"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar um mini TransactionInterceptor com JDK dynamic proxy sobre JDBC puro"
+        }
+      ]
+    },
+    "4.3.1": {
+      "summary": "Revisita processo vs thread com foco em concorrência: threads de um mesmo processo compartilham heap, código e descritores, mas têm stacks e registradores próprios. Esse compartilhamento de memória torna a comunicação barata e é exatamente a origem dos problemas de race condition, visibilidade e sincronização.",
+      "objectives": [
+        "Explicar o que threads de um processo compartilham (heap, dados estáticos, arquivos) e o que é privado (stack, registradores, PC).",
+        "Explicar por que comunicação entre threads é barata e entre processos exige IPC.",
+        "Relacionar memória compartilhada com a necessidade de sincronização.",
+        "Comparar o custo de criação e de context switch de processos e threads.",
+        "Explicar o mapeamento 1:1 entre threads de plataforma Java e threads do SO."
+      ],
+      "estimatedMinutes": 45,
+      "prerequisites": [
+        {
+          "key": "1.2.4",
+          "kind": "required",
+          "reason": "Este tópico aprofunda a comparação já estudada, com foco em compartilhamento de memória."
+        },
+        {
+          "key": "1.2.5",
+          "kind": "recommended",
+          "reason": "O custo do context switch influencia o desenho de sistemas concorrentes."
+        },
+        {
+          "key": "4.1.5",
+          "kind": "recommended",
+          "reason": "Cada thread Java tem sua própria JVM Stack, enquanto a heap é compartilhada."
+        }
+      ],
+      "checklist": [
+        "Explica o que é compartilhado e o que é privado entre threads de um processo.",
+        "Mostra com código duas threads alterando o mesmo objeto da heap.",
+        "Observa as threads do SO correspondentes às threads Java."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Listar o que threads de um mesmo processo compartilham e o que é privado"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Criar duas threads que alteram um mesmo objeto e duas que só usam variáveis locais"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Relacionar as threads de um jstack com as threads do SO (nid, top -H ou Process Explorer)"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Medir o custo de criar 10 mil threads vs 10 mil processos curtos"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Explicar quando usar múltiplos processos em vez de múltiplas threads"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar o mesmo contador compartilhado com threads (memória comum) e com processos (arquivo ou socket) e comparar"
+        }
+      ]
+    },
+    "4.3.2": {
+      "summary": "Concorrência é lidar com várias tarefas cujas execuções se sobrepõem no tempo (estrutura); paralelismo é executá-las literalmente ao mesmo tempo em vários núcleos (execução). Um sistema pode ser concorrente em um único núcleo via time slicing, e o ganho do paralelismo é limitado pela parte sequencial (Lei de Amdahl) e por contenção.",
+      "objectives": [
+        "Diferenciar concorrência de paralelismo com exemplos.",
+        "Diferenciar workloads CPU-bound e I/O-bound e o tipo de ganho de cada um.",
+        "Aplicar a Lei de Amdahl para estimar o speedup máximo.",
+        "Explicar por que mais threads nem sempre aumentam desempenho (contenção, context switch, cache)."
+      ],
+      "estimatedMinutes": 45,
+      "prerequisites": [
+        {
+          "key": "4.3.1",
+          "kind": "recommended",
+          "reason": "Threads são a unidade de execução concorrente."
+        },
+        {
+          "key": "1.2.9",
+          "kind": "recommended",
+          "reason": "Workloads I/O-bound se beneficiam de concorrência mesmo sem paralelismo."
+        }
+      ],
+      "checklist": [
+        "Explica a diferença entre concorrência e paralelismo com exemplos próprios.",
+        "Calcula o speedup máximo com a Lei de Amdahl.",
+        "Mede o efeito do número de threads em tarefas CPU-bound e I/O-bound."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Diferenciar concorrência de paralelismo com um exemplo do dia a dia e um de software"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Calcular com a Lei de Amdahl o speedup máximo de um processamento com 10% sequencial"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Medir o tempo de tarefas CPU-bound e I/O-bound variando o número de threads de 1 a 64"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Explicar por que um servidor single-threaded pode ser altamente concorrente"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Paralelizar um processamento CPU-bound e encontrar empiricamente o ponto de saturação"
+        }
+      ]
+    },
+    "4.3.3": {
+      "summary": "Race condition é quando o resultado depende da ordem ou do entrelaçamento (interleaving) não determinístico de threads acessando estado compartilhado, como em read-modify-write (count++) e check-then-act (if not exists then create). Bugs de corrida são intermitentes, difíceis de reproduzir e frequentemente só aparecem sob carga.",
+      "objectives": [
+        "Definir race condition e diferenciar de data race.",
+        "Reconhecer os padrões read-modify-write e check-then-act.",
+        "Enumerar interleavings possíveis de duas threads e prever resultados.",
+        "Explicar por que bugs de corrida são intermitentes e dependem de carga e hardware.",
+        "Identificar race conditions também fora da memória (arquivos, banco de dados, APIs)."
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "4.3.1",
+          "kind": "required",
+          "reason": "Race conditions surgem do compartilhamento de memória entre threads."
+        }
+      ],
+      "checklist": [
+        "Reproduz uma race condition com count++ e explica o resultado.",
+        "Lista os interleavings de duas threads executando read-modify-write.",
+        "Identifica check-then-act em código real."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar read-modify-write e check-then-act como fontes de race condition"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Incrementar um contador compartilhado com 4 threads e medir as atualizações perdidas"
+        },
+        {
+          "level": 2,
+          "type": "code_analysis",
+          "title": "Enumerar os interleavings possíveis de duas threads executando x = x + 1"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Encontrar a race condition check-then-act em um cadastro que gera usuários duplicados"
+        },
+        {
+          "level": 4,
+          "type": "experiment",
+          "title": "Usar o jcstress para revelar resultados de corrida em um caso de teste concorrente"
+        }
+      ]
+    },
+    "4.3.4": {
+      "summary": "Seção crítica é o trecho de código que acessa estado compartilhado e não pode ser executado por mais de uma thread ao mesmo tempo. Uma solução correta exige exclusão mútua, progresso e espera limitada, e o tamanho da seção crítica determina diretamente o nível de contenção e a escalabilidade.",
+      "objectives": [
+        "Identificar as seções críticas de um trecho de código.",
+        "Explicar os requisitos de exclusão mútua, progresso e espera limitada (bounded waiting).",
+        "Explicar por que seções críticas devem ser pequenas e não conter I/O.",
+        "Analisar o algoritmo de Peterson e por que ele não funciona em hardware moderno sem barreiras."
+      ],
+      "estimatedMinutes": 45,
+      "prerequisites": [
+        {
+          "key": "4.3.3",
+          "kind": "required",
+          "reason": "Seções críticas são o trecho onde race conditions podem acontecer."
+        }
+      ],
+      "checklist": [
+        "Marca corretamente as seções críticas de um código.",
+        "Explica os três requisitos de uma solução de seção crítica.",
+        "Reduz uma seção crítica e mede o efeito na vazão."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar exclusão mútua, progresso e espera limitada"
+        },
+        {
+          "level": 2,
+          "type": "code_analysis",
+          "title": "Marcar as seções críticas de uma classe de conta bancária"
+        },
+        {
+          "level": 3,
+          "type": "code_analysis",
+          "title": "Analisar o algoritmo de Peterson e explicar por que falha com reordenação de memória"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Comparar a vazão de um serviço com I/O dentro e fora da seção crítica"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Refatorar um cache para reduzir a seção crítica sem perder corretude"
+        }
+      ]
+    },
+    "4.3.5": {
+      "summary": "Uma classe é thread-safe quando se comporta corretamente sob acesso concorrente sem coordenação adicional dos chamadores. As estratégias são não compartilhar (confinamento), não mutar (imutabilidade) ou sincronizar; thread safety de operações isoladas não garante a de operações compostas.",
+      "objectives": [
+        "Definir thread safety em termos de invariantes e corretude.",
+        "Aplicar as estratégias: confinamento, imutabilidade, sincronização e delegação.",
+        "Explicar por que compor operações thread-safe não gera uma operação thread-safe.",
+        "Projetar classes imutáveis corretamente (final, cópias defensivas, publicação segura).",
+        "Classificar classes do JDK por nível de thread safety (StringBuilder, SimpleDateFormat, HashMap, ConcurrentHashMap)."
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "4.3.4",
+          "kind": "recommended",
+          "reason": "Proteger seções críticas é uma das estratégias de thread safety."
+        }
+      ],
+      "checklist": [
+        "Explica as estratégias de thread safety com exemplos.",
+        "Cria uma classe imutável correta.",
+        "Identifica uma composição não thread-safe de operações thread-safe."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar as quatro estratégias para obter thread safety"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Transformar uma classe mutável de valor monetário em imutável"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Encontrar o bug de usar SimpleDateFormat compartilhado entre threads"
+        },
+        {
+          "level": 3,
+          "type": "code_analysis",
+          "title": "Mostrar por que containsKey seguido de put em um mapa sincronizado não é atômico"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Projetar um contador de métricas thread-safe e documentar sua política de sincronização"
+        }
+      ]
+    },
+    "4.3.6": {
+      "summary": "Mutex (mutual exclusion) é uma primitiva com dono que permite a apenas uma thread por vez entrar numa seção crítica: quem adquire é quem deve liberar. Implementações reais combinam operações atômicas de hardware (test-and-set, CAS) com espera ativa breve (spinning) e bloqueio no kernel (futex no Linux).",
+      "objectives": [
+        "Explicar a semântica de um mutex e o conceito de ownership.",
+        "Explicar como instruções atômicas (test-and-set, CAS) permitem implementar um mutex.",
+        "Comparar spinlock com mutex bloqueante e quando cada um é adequado.",
+        "Explicar o custo de contenção: context switch, cache line bouncing."
+      ],
+      "estimatedMinutes": 45,
+      "prerequisites": [
+        {
+          "key": "4.3.4",
+          "kind": "required",
+          "reason": "O mutex é o mecanismo clássico para proteger seções críticas."
+        },
+        {
+          "key": "1.2.5",
+          "kind": "recommended",
+          "reason": "Bloquear em um mutex causa context switch."
+        }
+      ],
+      "checklist": [
+        "Explica ownership e por que outra thread não deve liberar o mutex.",
+        "Implementa um spinlock com uma operação atômica.",
+        "Compara spinlock e mutex bloqueante em cenários de alta e baixa contenção."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar exclusão mútua e ownership de um mutex"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Proteger um contador compartilhado com um mutex e comprovar a corretude"
+        },
+        {
+          "level": 3,
+          "type": "implementation",
+          "title": "Implementar um spinlock com AtomicBoolean.compareAndSet"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Comparar o spinlock com um lock bloqueante sob contenção alta e baixa"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Explicar quando spinning é preferível a bloquear a thread"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar um mutex com spin curto seguido de bloqueio via LockSupport.park e fila de espera"
+        }
+      ]
+    },
+    "4.3.7": {
+      "summary": "Lock é o termo geral para mecanismos de exclusão, que variam em propriedades: reentrância, justiça (fairness), leitura/escrita (read-write lock), tentativa com timeout e granularidade. A escolha afeta corretude, contenção e o risco de starvation ou deadlock.",
+      "objectives": [
+        "Explicar reentrância e por que ela evita auto-deadlock em chamadas recursivas.",
+        "Diferenciar locks justos e injustos e o trade-off com throughput.",
+        "Explicar read-write locks e quando eles realmente ajudam.",
+        "Comparar granularidade grossa e fina (lock striping) de locks.",
+        "Relacionar locks em memória com locks de banco de dados."
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "4.3.6",
+          "kind": "required",
+          "reason": "O mutex é o tipo mais básico de lock."
+        },
+        {
+          "key": "3.2.7",
+          "kind": "recommended",
+          "reason": "Os mesmos conceitos aparecem nos locks de banco de dados."
+        }
+      ],
+      "checklist": [
+        "Explica reentrância, fairness e read-write locks.",
+        "Escolhe a granularidade adequada para um cenário.",
+        "Explica starvation causada por locks injustos ou por escritores em read-write locks."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar reentrância, fairness e locks de leitura/escrita"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Proteger um mapa de configuração com read-write lock"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Comparar lock global e lock striping em um mapa sob contenção"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Explicar quando um read-write lock é mais lento que um lock simples"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar um mapa com lock striping por segmentos de hash"
+        }
+      ]
+    },
+    "4.3.8": {
+      "summary": "Semáforo é um contador de permissões com operações acquire (P/wait) e release (V/signal); diferente do mutex, não tem dono e permite até N threads simultâneas. Serve para limitar acesso a recursos escassos (conexões, chamadas externas) e para sinalização entre threads, como no problema produtor-consumidor.",
+      "objectives": [
+        "Explicar as operações P e V e o contador de permissões.",
+        "Diferenciar semáforo binário de mutex (ownership).",
+        "Usar semáforo para limitar concorrência a um recurso (bulkhead).",
+        "Resolver produtor-consumidor com semáforos."
+      ],
+      "estimatedMinutes": 45,
+      "prerequisites": [
+        {
+          "key": "4.3.6",
+          "kind": "required",
+          "reason": "Comparar com o mutex é essencial para entender o semáforo."
+        },
+        {
+          "key": "2.1.8",
+          "kind": "recommended",
+          "reason": "O problema produtor-consumidor usa uma fila limitada."
+        }
+      ],
+      "checklist": [
+        "Explica a diferença entre semáforo e mutex.",
+        "Limita chamadas concorrentes a um serviço com semáforo.",
+        "Implementa produtor-consumidor com semáforos."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Diferenciar semáforo de mutex"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Limitar a 5 as chamadas simultâneas a uma API externa com Semaphore"
+        },
+        {
+          "level": 3,
+          "type": "implementation",
+          "title": "Resolver produtor-consumidor com buffer limitado usando dois semáforos e um mutex"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Encontrar o vazamento de permissões de um semáforo sem release em finally"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar um pool de objetos genérico limitado por semáforo"
+        }
+      ]
+    },
+    "4.3.9": {
+      "summary": "Atomicidade é a propriedade de uma operação ser indivisível: outras threads a veem por completo ou não a veem. Operações aparentemente simples como i++ ou escrita de long/double de 64 bits em JVMs 32-bit não são atômicas; o hardware oferece instruções atômicas (CAS, fetch-and-add) que formam a base de algoritmos lock-free.",
+      "objectives": [
+        "Explicar atomicidade e por que i++ não é atômico.",
+        "Explicar compare-and-swap e o loop de retry de algoritmos lock-free.",
+        "Explicar o problema ABA.",
+        "Diferenciar atomicidade em memória da atomicidade de transações (ACID)."
+      ],
+      "estimatedMinutes": 45,
+      "prerequisites": [
+        {
+          "key": "4.3.3",
+          "kind": "required",
+          "reason": "A falta de atomicidade é a causa do read-modify-write com race."
+        },
+        {
+          "key": "3.2.2",
+          "kind": "recommended",
+          "reason": "Comparar com o 'A' de ACID evita confusão entre os conceitos."
+        }
+      ],
+      "checklist": [
+        "Explica por que i++ são três operações.",
+        "Explica o funcionamento do CAS e o loop de retry.",
+        "Explica o problema ABA com um exemplo."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar por que i++ não é uma operação atômica"
+        },
+        {
+          "level": 2,
+          "type": "code_analysis",
+          "title": "Identificar no bytecode (javap) as instruções separadas de um incremento de campo"
+        },
+        {
+          "level": 3,
+          "type": "implementation",
+          "title": "Implementar um incremento lock-free com loop de compare-and-swap"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Explicar o problema ABA e como versionar referências o resolve"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar uma pilha lock-free (Treiber stack) e testá-la sob concorrência"
+        }
+      ]
+    },
+    "4.3.10": {
+      "summary": "Visibilidade é a garantia de que a escrita de uma thread seja observada por outras; sem ela, caches de CPU, store buffers e otimizações do compilador (manter valor em registrador, reordenar instruções) podem fazer uma thread ver valores antigos indefinidamente. Barreiras de memória e primitivas de sincronização estabelecem essa garantia.",
+      "objectives": [
+        "Explicar por que escritas podem não ser visíveis a outras threads (caches, store buffers, registradores).",
+        "Explicar reordenação de instruções pelo compilador e pelo processador.",
+        "Diferenciar visibilidade de atomicidade.",
+        "Explicar o papel das memory barriers.",
+        "Explicar coerência de cache e o custo de false sharing."
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "4.3.9",
+          "kind": "recommended",
+          "reason": "Visibilidade e atomicidade são problemas distintos e frequentemente confundidos."
+        },
+        {
+          "key": "1.1.1",
+          "kind": "recommended",
+          "reason": "Caches de CPU explicam por que uma escrita pode não ser vista imediatamente."
+        }
+      ],
+      "checklist": [
+        "Explica a diferença entre visibilidade e atomicidade.",
+        "Reproduz um loop que nunca termina por falta de visibilidade.",
+        "Explica false sharing e como medi-lo."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar como caches e reordenação causam problemas de visibilidade"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Reproduzir uma thread que nunca enxerga a flag de parada alterada por outra"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Medir o impacto de false sharing em contadores adjacentes e corrigi-lo com padding"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Explicar por que visibilidade e atomicidade são garantias diferentes"
+        },
+        {
+          "level": 4,
+          "type": "experiment",
+          "title": "Usar o jcstress para observar reordenações permitidas entre duas escritas"
+        }
+      ]
+    },
+    "4.3.11": {
+      "summary": "Deadlock é um bloqueio permanente em que threads esperam umas pelas outras em ciclo; exige as quatro condições de Coffman (exclusão mútua, hold and wait, no preemption, circular wait). Prevenção atua em uma condição (ordem global de locks, timeouts com tryLock), e livelock e starvation são problemas vizinhos.",
+      "objectives": [
+        "Enumerar e explicar as quatro condições de Coffman.",
+        "Prevenir deadlock com ordenação global de locks e aquisição com timeout.",
+        "Detectar deadlocks em uma JVM com jstack ou ThreadMXBean.",
+        "Diferenciar deadlock, livelock e starvation.",
+        "Relacionar com deadlocks de banco de dados e como o SGBD os detecta."
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "4.3.7",
+          "kind": "required",
+          "reason": "Deadlocks surgem da aquisição de múltiplos locks."
+        },
+        {
+          "key": "3.2.8",
+          "kind": "recommended",
+          "reason": "O mesmo fenômeno ocorre em bancos de dados, com detecção automática."
+        }
+      ],
+      "checklist": [
+        "Reproduz um deadlock e o identifica no jstack.",
+        "Corrige com ordenação de locks e explica qual condição foi quebrada.",
+        "Diferencia deadlock de livelock e starvation."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar as quatro condições de Coffman"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Provocar um deadlock clássico de transferência entre duas contas"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Identificar o deadlock com jstack e com a seção 'Found one Java-level deadlock'"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Corrigir o deadlock impondo uma ordem global de aquisição de locks"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Diferenciar deadlock, livelock e starvation com exemplos"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar um detector de deadlock que usa ThreadMXBean e gera alerta"
+        }
+      ]
+    },
+    "4.4.1": {
+      "summary": "O Java Memory Model (JSR-133) define quais valores uma leitura pode observar em programas concorrentes por meio da relação happens-before: unlock→lock do mesmo monitor, escrita→leitura volatile, Thread.start, Thread.join e semântica de campos final. Um programa sem data races é sequencialmente consistente; com data races, reordenações permitidas podem produzir resultados surpreendentes.",
+      "objectives": [
+        "Explicar o que o JMM especifica e por que ele existe.",
+        "Listar as regras de happens-before e aplicá-las a um trecho de código.",
+        "Definir data race no sentido do JMM e a garantia de consistência sequencial para programas sem data race.",
+        "Explicar a semântica especial de campos final e publicação segura.",
+        "Explicar por que o double-checked locking sem volatile é incorreto."
+      ],
+      "estimatedMinutes": 90,
+      "prerequisites": [
+        {
+          "key": "4.3.10",
+          "kind": "required",
+          "reason": "O JMM formaliza as garantias de visibilidade e ordenação."
+        },
+        {
+          "key": "4.3.9",
+          "kind": "recommended",
+          "reason": "Atomicidade e visibilidade são os problemas que o JMM organiza."
+        }
+      ],
+      "checklist": [
+        "Aplica happens-before para determinar se uma leitura vê uma escrita.",
+        "Explica o bug do double-checked locking sem volatile.",
+        "Explica o que é publicação segura e as formas de obtê-la."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar a relação happens-before e listar suas regras principais"
+        },
+        {
+          "level": 2,
+          "type": "code_analysis",
+          "title": "Determinar, por happens-before, quais valores uma thread leitora pode observar"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Explicar e corrigir o double-checked locking sem volatile"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Explicar publicação segura e a garantia de campos final"
+        },
+        {
+          "level": 4,
+          "type": "experiment",
+          "title": "Escrever testes jcstress que demonstrem reordenação sem happens-before e sua ausência com volatile"
+        }
+      ]
+    },
+    "4.4.2": {
+      "summary": "synchronized usa o monitor intrínseco de cada objeto para exclusão mútua reentrante e estabelece happens-before entre unlock e lock subsequente. No bytecode vira monitorenter/monitorexit (ou flag ACC_SYNCHRONIZED); a JVM usa thin locks no mark word e infla para monitores pesados sob contenção, e wait/notify implementam condições.",
+      "objectives": [
+        "Usar synchronized em métodos e blocos e escolher o objeto de lock.",
+        "Explicar monitorenter/monitorexit e a reentrância do monitor.",
+        "Explicar thin lock, inflação do monitor e o mark word.",
+        "Usar wait/notify corretamente (laço while, condição, notifyAll).",
+        "Explicar os perigos de sincronizar em objetos públicos, strings ou boxed values."
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        {
+          "key": "4.4.1",
+          "kind": "required",
+          "reason": "A semântica de memória do synchronized é definida pelo JMM."
+        },
+        {
+          "key": "4.3.6",
+          "kind": "recommended",
+          "reason": "synchronized é a implementação de mutex embutida na linguagem."
+        },
+        {
+          "key": "4.1.2",
+          "kind": "recommended",
+          "reason": "monitorenter e monitorexit aparecem no bytecode."
+        }
+      ],
+      "checklist": [
+        "Corrige uma race condition com synchronized e comprova com testes.",
+        "Mostra no javap as instruções monitorenter/monitorexit.",
+        "Implementa uma fila bloqueante com wait/notifyAll.",
+        "Explica por que wait deve estar dentro de while."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar como synchronized garante exclusão mútua e visibilidade"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Comparar no javap um método synchronized e um bloco synchronized"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Corrigir um contador com race condition usando synchronized"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Encontrar o bug de sincronização em um Integer que é reatribuído"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Corrigir um consumidor que usa if em vez de while ao redor de wait()"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar uma BlockingQueue limitada com synchronized, wait e notifyAll"
+        }
+      ]
+    },
+    "4.4.3": {
+      "summary": "volatile garante visibilidade e ordenação: toda escrita volatile happens-before as leituras subsequentes da mesma variável, e o compilador insere barreiras que impedem reordenações em torno dela. Não garante atomicidade de operações compostas, então serve para flags, publicação de referências imutáveis e double-checked locking, mas não para contadores.",
+      "objectives": [
+        "Explicar as garantias de visibilidade e ordenação do volatile.",
+        "Explicar por que volatile não torna count++ atômico.",
+        "Identificar casos de uso corretos: flags de parada, publicação de estado imutável, DCL.",
+        "Explicar o custo do volatile em termos de barreiras de memória."
+      ],
+      "estimatedMinutes": 45,
+      "prerequisites": [
+        {
+          "key": "4.4.1",
+          "kind": "required",
+          "reason": "volatile só faz sentido à luz das regras de happens-before."
+        },
+        {
+          "key": "4.3.10",
+          "kind": "recommended",
+          "reason": "volatile resolve o problema de visibilidade."
+        }
+      ],
+      "checklist": [
+        "Corrige um loop sem visibilidade com volatile.",
+        "Demonstra que volatile não corrige count++.",
+        "Escolhe corretamente entre volatile e synchronized em cenários dados."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar o que volatile garante e o que não garante"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Corrigir com volatile uma flag de parada que nunca era vista pela thread trabalhadora"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Demonstrar que volatile int com count++ ainda perde atualizações"
+        },
+        {
+          "level": 3,
+          "type": "code_analysis",
+          "title": "Decidir entre volatile, synchronized e Atomic para cinco trechos de código"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar recarga de configuração publicando um objeto imutável via referência volatile"
+        }
+      ]
+    },
+    "4.4.4": {
+      "summary": "As classes de java.util.concurrent.atomic (AtomicInteger, AtomicLong, AtomicReference) oferecem operações atômicas lock-free baseadas em CAS do hardware, com semântica de memória de volatile. Sob alta contenção os retries de CAS degradam o desempenho, e LongAdder distribui o contador em células para escalar melhor.",
+      "objectives": [
+        "Usar AtomicInteger, AtomicLong e AtomicReference com incrementAndGet, compareAndSet e updateAndGet.",
+        "Explicar como CAS é implementado (lock cmpxchg) e o loop de retry.",
+        "Comparar AtomicLong e LongAdder sob contenção e explicar as células do LongAdder.",
+        "Explicar VarHandle como API de baixo nível para operações atômicas.",
+        "Explicar o problema ABA e AtomicStampedReference."
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "4.3.9",
+          "kind": "required",
+          "reason": "Tipos atômicos implementam a atomicidade via CAS."
+        },
+        {
+          "key": "4.4.3",
+          "kind": "recommended",
+          "reason": "Atomic* tem a mesma semântica de visibilidade do volatile."
+        }
+      ],
+      "checklist": [
+        "Corrige um contador com AtomicInteger.",
+        "Mede AtomicLong vs LongAdder com várias threads usando JMH.",
+        "Implementa uma atualização complexa com compareAndSet ou updateAndGet."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar como AtomicInteger garante atomicidade sem locks"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Implementar um gerador de IDs sequenciais thread-safe com AtomicLong"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Comparar com JMH AtomicLong, LongAdder e synchronized com 1, 4 e 16 threads"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Corrigir um código que usa get() e set() separados em um AtomicInteger"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar um rate limiter token bucket lock-free com AtomicReference"
+        }
+      ]
+    },
+    "4.4.5": {
+      "summary": "ReentrantLock é um lock explícito baseado no AbstractQueuedSynchronizer (AQS), que mantém estado via CAS e uma fila de threads estacionadas com LockSupport.park. Oferece o que synchronized não oferece: tryLock com timeout, aquisição interrompível, fairness opcional e múltiplas Conditions; em troca, exige unlock em finally.",
+      "objectives": [
+        "Usar lock/unlock com try/finally, tryLock com timeout e lockInterruptibly.",
+        "Explicar como o AQS implementa a fila de espera e o estado do lock.",
+        "Usar Condition para múltiplas filas de espera.",
+        "Comparar ReentrantLock e synchronized em recursos e desempenho.",
+        "Conhecer ReentrantReadWriteLock e StampedLock (leitura otimista)."
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "4.4.2",
+          "kind": "required",
+          "reason": "ReentrantLock é a alternativa explícita ao synchronized."
+        },
+        {
+          "key": "4.3.7",
+          "kind": "recommended",
+          "reason": "Fairness, reentrância e read-write locks foram vistos conceitualmente."
+        }
+      ],
+      "checklist": [
+        "Usa ReentrantLock com unlock em finally e tryLock com timeout.",
+        "Implementa uma fila limitada com duas Conditions.",
+        "Justifica quando escolher ReentrantLock em vez de synchronized."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Comparar ReentrantLock e synchronized"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Evitar deadlock na transferência entre contas usando tryLock com timeout"
+        },
+        {
+          "level": 3,
+          "type": "implementation",
+          "title": "Implementar uma fila limitada com ReentrantLock e as Conditions notFull e notEmpty"
+        },
+        {
+          "level": 3,
+          "type": "code_analysis",
+          "title": "Ler o código do AQS e explicar como uma thread é enfileirada e estacionada"
+        },
+        {
+          "level": 4,
+          "type": "experiment",
+          "title": "Comparar ReentrantReadWriteLock e StampedLock em um cache com 95% de leituras"
+        }
+      ]
+    },
+    "4.4.6": {
+      "summary": "As coleções concorrentes do java.util.concurrent oferecem thread safety com melhor escalabilidade que Collections.synchronized*: ConcurrentHashMap (CAS em buckets vazios e lock por bin, resize cooperativo, operações atômicas compute/merge), CopyOnWriteArrayList e as filas bloqueantes usadas por thread pools. Iteradores são fracamente consistentes em vez de fail-fast.",
+      "objectives": [
+        "Explicar a implementação do ConcurrentHashMap no Java 8+ (CAS, lock por bin, treeification).",
+        "Usar operações atômicas compostas (computeIfAbsent, merge) em vez de check-then-act.",
+        "Diferenciar iteradores fail-fast e weakly consistent.",
+        "Escolher entre ArrayBlockingQueue, LinkedBlockingQueue, SynchronousQueue e ConcurrentLinkedQueue.",
+        "Explicar quando CopyOnWriteArrayList é adequado e seu custo de escrita."
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        {
+          "key": "2.4.2",
+          "kind": "required",
+          "reason": "ConcurrentHashMap é uma variação concorrente da estrutura do HashMap."
+        },
+        {
+          "key": "4.4.4",
+          "kind": "recommended",
+          "reason": "A implementação usa CAS extensivamente."
+        },
+        {
+          "key": "4.3.5",
+          "kind": "recommended",
+          "reason": "Delegar thread safety a coleções concorrentes é uma estratégia de thread safety."
+        }
+      ],
+      "checklist": [
+        "Explica como o ConcurrentHashMap evita um lock global.",
+        "Substitui check-then-act por computeIfAbsent ou merge.",
+        "Escolhe a fila bloqueante adequada para um cenário."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar como o ConcurrentHashMap obtém concorrência sem lock global"
+        },
+        {
+          "level": 2,
+          "type": "bug_hunt",
+          "title": "Corrigir uma contagem de palavras com get + put em ConcurrentHashMap usando merge"
+        },
+        {
+          "level": 2,
+          "type": "bug_hunt",
+          "title": "Diagnosticar ConcurrentModificationException ao alterar um ArrayList durante iteração"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Comparar com JMH Collections.synchronizedMap e ConcurrentHashMap com várias threads"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Explicar por que ConcurrentHashMap não aceita chaves e valores null"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar um cache memoizado thread-safe com computeIfAbsent evitando cálculo duplicado"
+        }
+      ]
+    },
+    "4.4.7": {
+      "summary": "Thread pools reaproveitam um conjunto fixo de threads para executar tarefas de uma fila, evitando o custo de criar threads e limitando a concorrência. O ThreadPoolExecutor cria threads até corePoolSize, depois enfileira, só cresce até maxPoolSize quando a fila enche e então aplica a RejectedExecutionHandler — e filas ilimitadas escondem sobrecarga.",
+      "objectives": [
+        "Explicar os parâmetros do ThreadPoolExecutor e a ordem real de decisão (core → fila → max → rejeição).",
+        "Dimensionar pools para workloads CPU-bound e I/O-bound (fórmula de Goetz).",
+        "Explicar os riscos das fábricas Executors (fila ilimitada, threads ilimitadas).",
+        "Escolher políticas de rejeição (Abort, CallerRuns, Discard) como mecanismo de backpressure.",
+        "Explicar thread starvation deadlock em pools com tarefas dependentes."
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        {
+          "key": "4.3.2",
+          "kind": "required",
+          "reason": "O dimensionamento depende de distinguir CPU-bound de I/O-bound."
+        },
+        {
+          "key": "4.4.6",
+          "kind": "recommended",
+          "reason": "O pool usa uma BlockingQueue como fila de tarefas."
+        },
+        {
+          "key": "3.4.11",
+          "kind": "recommended",
+          "reason": "Connection pools seguem a mesma lógica de reaproveitar recursos caros."
+        }
+      ],
+      "checklist": [
+        "Explica a ordem de decisão do ThreadPoolExecutor.",
+        "Configura um pool com fila limitada e política de rejeição justificadas.",
+        "Reproduz e explica thread starvation deadlock."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar a ordem de decisão do ThreadPoolExecutor entre core, fila e max"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Prever e comprovar quantas threads um pool core=2, max=10 com fila ilimitada cria"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Diagnosticar OutOfMemoryError causado por Executors.newFixedThreadPool com fila ilimitada"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Reproduzir thread starvation deadlock com tarefas que esperam subtarefas no mesmo pool"
+        },
+        {
+          "level": 4,
+          "type": "project",
+          "title": "Configurar e instrumentar um pool para um workload I/O-bound e medir throughput e latência"
+        }
+      ]
+    },
+    "4.4.8": {
+      "summary": "ExecutorService é a abstração que separa submissão de tarefas da sua execução, com submit, invokeAll, invokeAny e ciclo de vida (shutdown, shutdownNow, awaitTermination). Exceções em tarefas submetidas ficam capturadas no Future e somem silenciosamente se ninguém o consultar, e o encerramento correto exige tratar interrupção.",
+      "objectives": [
+        "Usar execute, submit, invokeAll e invokeAny e entender as diferenças.",
+        "Implementar encerramento gracioso com shutdown, awaitTermination e shutdownNow.",
+        "Explicar por que exceções de tarefas submetidas podem ser perdidas.",
+        "Tratar InterruptedException corretamente (restaurar a flag de interrupção).",
+        "Usar ScheduledExecutorService e entender fixedRate vs fixedDelay."
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "4.4.7",
+          "kind": "required",
+          "reason": "ExecutorService é a interface implementada pelos thread pools."
+        }
+      ],
+      "checklist": [
+        "Implementa shutdown gracioso com timeout.",
+        "Demonstra a diferença de tratamento de exceção entre execute e submit.",
+        "Trata InterruptedException sem engolir a interrupção."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar o ciclo de vida de um ExecutorService"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Implementar shutdown gracioso com awaitTermination e fallback para shutdownNow"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Descobrir por que exceções de tarefas submetidas com submit nunca aparecem no log"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Corrigir uma tarefa que engole InterruptedException e impede o encerramento do pool"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar um agendador de jobs com ScheduledExecutorService, retry e métricas"
+        }
+      ]
+    },
+    "4.4.9": {
+      "summary": "Future representa o resultado de uma computação assíncrona, consultado com get() (bloqueante, com ou sem timeout), isDone() e cancel(). Sua limitação é não permitir composição nem callbacks: obter o resultado bloqueia a thread chamadora, o que motivou o CompletableFuture.",
+      "objectives": [
+        "Usar Callable e Future para obter resultados de tarefas assíncronas.",
+        "Usar get com timeout e tratar ExecutionException e TimeoutException.",
+        "Explicar a semântica de cancel(true) e sua dependência de interrupção.",
+        "Explicar as limitações do Future (bloqueio, ausência de composição)."
+      ],
+      "estimatedMinutes": 45,
+      "prerequisites": [
+        {
+          "key": "4.4.8",
+          "kind": "required",
+          "reason": "Future é retornado por ExecutorService.submit."
+        }
+      ],
+      "checklist": [
+        "Executa tarefas em paralelo e agrega resultados com Future.",
+        "Trata timeout e cancela tarefas corretamente.",
+        "Explica por que Future não permite composição não bloqueante."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar o que um Future representa e suas limitações"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Consultar três serviços simulados em paralelo e agregar os resultados com Future"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Demonstrar que cancel(true) não interrompe uma tarefa que ignora interrupção"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Corrigir um código que chama get() sem timeout e trava sob falha de dependência"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar um FutureTask simplificado com wait/notify"
+        }
+      ]
+    },
+    "4.4.10": {
+      "summary": "CompletableFuture permite compor computações assíncronas de forma declarativa (thenApply, thenCompose, thenCombine, allOf, anyOf), tratar erros (exceptionally, handle) e aplicar timeouts (orTimeout). Por padrão usa o ForkJoinPool.commonPool, inadequado para I/O bloqueante; a escolha do executor e de onde cada estágio roda é decisiva.",
+      "objectives": [
+        "Compor etapas com thenApply, thenCompose e thenCombine e explicar a diferença.",
+        "Combinar múltiplas chamadas com allOf/anyOf.",
+        "Tratar erros com exceptionally, handle e whenComplete.",
+        "Explicar em qual thread cada estágio executa e os riscos do commonPool para I/O.",
+        "Aplicar timeouts com orTimeout e completeOnTimeout."
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        {
+          "key": "4.4.9",
+          "kind": "required",
+          "reason": "CompletableFuture estende Future com composição e callbacks."
+        },
+        {
+          "key": "4.4.7",
+          "kind": "recommended",
+          "reason": "A escolha do executor define onde os estágios rodam."
+        }
+      ],
+      "checklist": [
+        "Compõe chamadas assíncronas dependentes e independentes corretamente.",
+        "Trata erros e timeouts sem bloquear threads.",
+        "Explica por que I/O bloqueante não deve rodar no commonPool."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Diferenciar thenApply, thenCompose e thenCombine"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Agregar dados de três serviços com allOf e timeout por chamada"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Diagnosticar a saturação do commonPool causada por chamadas bloqueantes"
+        },
+        {
+          "level": 3,
+          "type": "code_analysis",
+          "title": "Determinar em qual thread cada estágio de uma cadeia de CompletableFuture executa"
+        },
+        {
+          "level": 4,
+          "type": "project",
+          "title": "Construir um agregador de APIs com fallback, timeout, executor dedicado e métricas"
+        }
+      ]
+    },
+    "4.4.11": {
+      "summary": "Virtual threads (Java 21, JEP 444) são threads leves gerenciadas pela JVM: são montadas em carrier threads de um ForkJoinPool e, ao bloquear em I/O, têm a stack salva na heap e são desmontadas, liberando a carrier. Isso torna viável uma thread por tarefa com milhões de threads, mas não acelera trabalho CPU-bound, e pinning (synchronized até o Java 23, código nativo) impede a desmontagem.",
+      "objectives": [
+        "Explicar como virtual threads são montadas e desmontadas em carrier threads (continuations).",
+        "Explicar por que virtual threads ajudam em workloads I/O-bound e não em CPU-bound.",
+        "Explicar pinning, suas causas e como detectá-lo (-Djdk.tracePinnedThreads, JFR jdk.VirtualThreadPinned) e a mudança do JEP 491 no Java 24.",
+        "Explicar por que não se faz pool de virtual threads e como limitar concorrência (Semaphore).",
+        "Explicar os riscos de ThreadLocal com milhões de threads e o papel de Scoped Values.",
+        "Habilitar virtual threads no Spring Boot e avaliar o efeito no pool de conexões do banco."
+      ],
+      "estimatedMinutes": 90,
+      "prerequisites": [
+        {
+          "key": "4.4.7",
+          "kind": "required",
+          "reason": "Virtual threads mudam o modelo de thread pools e thread-per-request."
+        },
+        {
+          "key": "4.4.2",
+          "kind": "recommended",
+          "reason": "synchronized é a causa clássica de pinning."
+        },
+        {
+          "key": "1.2.5",
+          "kind": "recommended",
+          "reason": "Virtual threads evitam context switches do SO ao trocar de tarefa."
+        },
+        {
+          "key": "1.2.9",
+          "kind": "recommended",
+          "reason": "O ganho vem de liberar a carrier durante I/O bloqueante."
+        }
+      ],
+      "checklist": [
+        "Explica montagem, desmontagem e carrier threads.",
+        "Cria um milhão de virtual threads e compara com threads de plataforma.",
+        "Detecta pinning com JFR ou jdk.tracePinnedThreads e corrige.",
+        "Explica por que virtual threads não melhoram tarefas CPU-bound."
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar como virtual threads são montadas em carrier threads"
+        },
+        {
+          "level": 1,
+          "type": "interview",
+          "title": "Explicar quando virtual threads não trazem ganho"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Criar 1 milhão de virtual threads com sleep e comparar memória e tempo com threads de plataforma"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Detectar pinning com JFR (jdk.VirtualThreadPinned) em código com synchronized e I/O"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Diagnosticar esgotamento do pool de conexões após migrar um serviço para virtual threads"
+        },
+        {
+          "level": 4,
+          "type": "project",
+          "title": "Migrar um serviço Spring Boot para virtual threads e comparar throughput e latência com o modelo de pool"
+        }
+      ]
+    }
+  }
+}

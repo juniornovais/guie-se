@@ -1,0 +1,1278 @@
+{
+  "stage": "02",
+  "modules": {
+    "2.1": {
+      "description": "Base de análise de algoritmos e das estruturas lineares sobre as quais todo o resto é construído. Introduz como medir custo de tempo e espaço (pior caso, caso médio, amortizado) e examina por dentro array, array dinâmico, lista ligada, stack, queue e deque, sempre relacionando o modelo de memória (contiguidade, ponteiros, cache) com o custo real de cada operação e com as implementações do Java (ArrayList, LinkedList, ArrayDeque).",
+      "objectives": [
+        "Analisar a complexidade de tempo e espaço de um trecho de código, incluindo custo amortizado e espaço da recursão",
+        "Usar Big O, Big Omega e Big Theta com rigor e saber quando as constantes e o hardware importam na prática",
+        "Explicar o layout em memória de arrays e listas ligadas e o impacto disso em acesso, inserção e localidade de cache",
+        "Comparar ArrayList, LinkedList e ArrayDeque do Java com base em custos reais, não em intuição",
+        "Implementar do zero array dinâmico, lista ligada, stack, queue e deque com suas invariantes corretas"
+      ]
+    },
+    "2.2": {
+      "description": "Algoritmos clássicos de busca e ordenação e as técnicas de raciocínio que os sustentam: recursão e divisão e conquista. O módulo cobre o funcionamento passo a passo, as invariantes que garantem correção, a análise de custo (inclusive via recorrências e Teorema Mestre) e como a biblioteca do Java implementa Arrays.sort e Collections.sort.",
+      "objectives": [
+        "Escolher entre busca linear e binária conforme pré-condições e custo de preparação dos dados",
+        "Implementar busca binária sem erros de borda usando invariantes explícitas",
+        "Comparar algoritmos de ordenação quanto a tempo, espaço, estabilidade e comportamento em entradas reais",
+        "Escrever funções recursivas corretas, identificando caso base, progresso e custo de pilha",
+        "Modelar algoritmos de divisão e conquista com recorrências e resolvê-las"
+      ]
+    },
+    "2.3": {
+      "description": "Módulo voltado a padrões de entrevista: em vez de estudar a estrutura em si, treina reconhecer, a partir do enunciado, qual estrutura ou técnica resolve o problema. Cobre fast/slow pointers e manipulação in-place de listas, monotonic stack, filas para simulação e BFS, busca binária na resposta, heaps para top-k e merge de k fluxos, e problemas de intervalos.",
+      "objectives": [
+        "Reconhecer sinais no enunciado que indicam cada padrão (lista ligada, stack, queue, binary search, heap, intervals)",
+        "Resolver problemas clássicos LeetCode Easy/Medium de cada padrão dentro do tempo de uma entrevista",
+        "Justificar a complexidade da solução e compará-la com a abordagem ingênua",
+        "Comunicar o raciocínio em voz alta, tratando casos de borda antes de codificar",
+        "Montar um repertório pessoal de templates reutilizáveis para cada padrão"
+      ]
+    },
+    "2.4": {
+      "description": "Estruturas não lineares essenciais: tabelas hash, árvores, heaps e grafos. O foco é o funcionamento interno e os custos — funções de hash, colisões, load factor e resize; formas e propriedades de árvores binárias e BSTs; heap binário em array; representações de grafos — conectando cada estrutura às implementações do Java (HashMap, HashSet, TreeMap, PriorityQueue).",
+      "objectives": [
+        "Explicar como uma tabela hash atinge O(1) esperado e quando degrada, incluindo o tratamento de colisões no HashMap do Java",
+        "Implementar e percorrer árvores binárias e BSTs, analisando o efeito da altura no custo",
+        "Implementar um heap binário em array e explicar o custo de heapify e de cada operação",
+        "Representar grafos com lista e matriz de adjacência e escolher a representação adequada",
+        "Selecionar a estrutura correta do Java Collections para um requisito de acesso dado"
+      ]
+    },
+    "2.5": {
+      "description": "Padrões mais frequentes em entrevistas sobre sequências: manipulação de arrays e strings, uso de hashing para contagem e busca, two pointers, sliding window e prefix sum. O módulo ensina a transformar soluções O(n²) em O(n) reconhecendo a estrutura do problema e mantendo invariantes ao percorrer a entrada.",
+      "objectives": [
+        "Aplicar técnicas in-place em arrays e reconhecer quando ordenar simplifica o problema",
+        "Manipular strings em Java com consciência de imutabilidade, StringBuilder e codificação de caracteres",
+        "Usar hashing para contagem de frequência, agrupamento e complemento",
+        "Resolver problemas com two pointers, sliding window (fixa e variável) e prefix sum, justificando a corretude",
+        "Otimizar soluções de força bruta para tempo linear explicando o ganho"
+      ]
+    },
+    "2.6": {
+      "description": "Problemas recursivos e de busca em estruturas não lineares: padrões em árvores, DFS, BFS, grafos (componentes, ciclos, ordenação topológica), backtracking, algoritmos gulosos e programação dinâmica básica. O foco é escolher a estratégia de exploração certa, provar (ao menos informalmente) a corretude e controlar a complexidade.",
+      "objectives": [
+        "Resolver problemas de árvore e grafo escolhendo entre DFS e BFS com justificativa",
+        "Implementar DFS recursiva e iterativa e BFS por níveis sem erros de visitação",
+        "Aplicar backtracking com poda para gerar combinações, permutações e subconjuntos",
+        "Distinguir quando uma escolha gulosa é correta e quando é necessário programação dinâmica",
+        "Formular estados, transições e casos base de problemas de DP básicos, com memoização e tabulação"
+      ]
+    }
+  },
+  "topics": {
+    "2.1.1": {
+      "summary": "Como medir o crescimento do número de operações de um algoritmo em função do tamanho da entrada, considerando pior caso, caso médio e custo amortizado. É a ferramenta que permite comparar soluções antes de executá-las e justificar escolhas em entrevistas.",
+      "objectives": [
+        "Contar operações dominantes em laços simples, aninhados e dependentes (ex.: j de i até n)",
+        "Diferenciar pior caso, melhor caso, caso médio e custo amortizado com exemplos",
+        "Reconhecer as classes O(1), O(log n), O(n), O(n log n), O(n²), O(2^n) e O(n!) e estimar o n máximo viável para cada uma em ~1 segundo",
+        "Analisar complexidade com múltiplas variáveis de entrada (ex.: O(n + m), O(n·m))",
+        "Identificar custos escondidos em chamadas de biblioteca (String concatenation, list.contains, substring)"
+      ],
+      "estimatedMinutes": 90,
+      "prerequisites": [
+        { "key": "1.1.1", "kind": "recommended", "reason": "Entender que a CPU executa instruções a uma taxa finita ajuda a relacionar contagem de operações com tempo real" }
+      ],
+      "checklist": [
+        "Determino a complexidade de tempo de 10 trechos de código variados sem errar a classe",
+        "Explico por que dois laços aninhados nem sempre são O(n²)",
+        "Estimo, a partir de restrições de um problema (ex.: n ≤ 10^5), qual complexidade é aceitável",
+        "Aponto pelo menos dois custos escondidos de APIs do Java em código real"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar a diferença entre pior caso, caso médio e custo amortizado usando busca em array" },
+        { "level": 2, "type": "code_analysis", "title": "Determinar a complexidade de tempo de 8 trechos com laços aninhados, dependentes e logarítmicos" },
+        { "level": 2, "type": "bug_hunt", "title": "Encontrar o custo O(n²) escondido em um laço que concatena Strings e chama list.contains" },
+        { "level": 3, "type": "experiment", "title": "Medir em Java o tempo de algoritmos O(n), O(n log n) e O(n²) para n crescente e plotar as curvas" },
+        { "level": 3, "type": "interview", "title": "Dadas as restrições n ≤ 10^5, justificar por que uma solução O(n²) não passa e qual classe é necessária" },
+        { "level": 4, "type": "implementation", "title": "Construir um mini-harness de benchmark que detecte empiricamente a classe de complexidade de uma função" }
+      ]
+    },
+    "2.1.2": {
+      "summary": "Quanto de memória adicional um algoritmo consome em função da entrada, incluindo estruturas auxiliares e a profundidade da pilha de chamadas. Importa porque memória é limitada, afeta cache e GC, e entrevistadores frequentemente pedem soluções in-place.",
+      "objectives": [
+        "Distinguir espaço de entrada, espaço auxiliar e espaço total",
+        "Calcular o espaço consumido pela recursão a partir da profundidade máxima da call stack",
+        "Explicar o trade-off tempo × espaço com exemplos (memoização, tabelas hash, pré-computação)",
+        "Estimar o consumo real de memória de estruturas Java (overhead de objetos, boxing de Integer, referências)",
+        "Reconhecer quando uma solução in-place é possível e quais riscos ela traz (mutação da entrada)"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        { "key": "1.1.9", "kind": "recommended", "reason": "O espaço da recursão é a profundidade da call stack" },
+        { "key": "1.1.8", "kind": "recommended", "reason": "Estruturas auxiliares em Java vivem no heap e geram pressão no GC" },
+        { "key": "2.1.1", "kind": "recommended", "reason": "A mesma notação assintótica é usada para espaço" }
+      ],
+      "checklist": [
+        "Calculo o espaço auxiliar de soluções iterativas e recursivas, incluindo a pilha",
+        "Explico por que int[] e List<Integer> com n elementos têm consumos muito diferentes",
+        "Transformo uma solução com espaço O(n) em O(1) quando o problema permite"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar a diferença entre espaço auxiliar e espaço total e por que a entrada geralmente não conta" },
+        { "level": 2, "type": "code_analysis", "title": "Calcular o espaço de versões recursiva e iterativa de fatorial, Fibonacci e soma de array" },
+        { "level": 2, "type": "coding", "title": "Reverter um array in-place com espaço O(1) e comparar com a versão que aloca cópia" },
+        { "level": 3, "type": "experiment", "title": "Medir com Runtime/JOL o consumo de int[] versus ArrayList<Integer> com 1 milhão de elementos" },
+        { "level": 3, "type": "interview", "title": "Discutir o trade-off tempo × espaço ao usar memoização em Fibonacci versus a versão com duas variáveis" },
+        { "level": 4, "type": "project", "title": "Construir um utilitário que estime e compare o footprint de memória de estruturas Java (arrays, ArrayList, HashMap) para n crescente" }
+      ]
+    },
+    "2.1.3": {
+      "summary": "A notação assintótica formal (O, Ω, Θ) e as regras de simplificação usadas para classificar algoritmos. Cobre também os limites da notação: constantes, termos de baixa ordem e efeitos de hardware que fazem um O(n log n) perder para um O(n²) em entradas pequenas.",
+      "objectives": [
+        "Definir formalmente O, Ω e Θ e aplicar as definições para provar limites simples",
+        "Aplicar regras de simplificação: descartar constantes, termos dominados, soma e produto de custos",
+        "Ordenar funções por taxa de crescimento (log n, √n, n, n log n, n², 2^n, n!)",
+        "Explicar por que Big O descreve um limite superior e não necessariamente o caso real",
+        "Reconhecer situações em que constantes e localidade de cache dominam a escolha prática (ex.: insertion sort em arrays pequenos no TimSort)"
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        { "key": "2.1.1", "kind": "required", "reason": "A notação formaliza a análise de complexidade de tempo" }
+      ],
+      "checklist": [
+        "Ordeno corretamente 10 funções por taxa de crescimento",
+        "Provo pela definição que 3n² + 5n + 2 é Θ(n²)",
+        "Explico com um exemplo real quando o algoritmo assintoticamente pior vence na prática"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Diferenciar O, Ω e Θ e explicar por que 'busca binária é O(n)' é tecnicamente verdadeiro mas pouco útil" },
+        { "level": 2, "type": "coding", "title": "Ordenar por crescimento um conjunto de 10 funções e justificar cada comparação" },
+        { "level": 2, "type": "interview", "title": "Simplificar expressões de custo como O(2n + n log n + 100) e O(n·m + m²) explicando cada passo" },
+        { "level": 3, "type": "experiment", "title": "Encontrar empiricamente o ponto de cruzamento entre insertion sort e merge sort em Java" },
+        { "level": 4, "type": "project", "title": "Criar uma tabela de referência pessoal de complexidades das operações do Java Collections com justificativa de cada uma" }
+      ]
+    },
+    "2.1.4": {
+      "summary": "Array como bloco contíguo de memória com elementos de tamanho fixo, o que permite acesso por índice em O(1) via cálculo de endereço. Entender sua representação explica os custos de inserção/remoção, a vantagem de localidade de cache e como arrays funcionam na JVM.",
+      "objectives": [
+        "Explicar o cálculo de endereço base + índice × tamanho do elemento e por que o acesso é O(1)",
+        "Analisar o custo de inserção e remoção no meio, no início e no fim de um array",
+        "Explicar a localidade espacial e o impacto do cache da CPU na iteração sobre arrays",
+        "Descrever como arrays de primitivos e de referências são armazenados no heap da JVM (header, length, elementos)",
+        "Usar corretamente System.arraycopy, Arrays.fill, Arrays.copyOf e arrays multidimensionais em Java"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        { "key": "1.1.6", "kind": "recommended", "reason": "O acesso por índice é aritmética de endereços de memória" },
+        { "key": "1.1.2", "kind": "recommended", "reason": "Contiguidade e cache dependem do modelo de RAM" }
+      ],
+      "checklist": [
+        "Explico por que o acesso por índice é O(1) e inserir no início é O(n)",
+        "Diferencio em memória int[] de Integer[] e explico o custo de indireção",
+        "Implemento inserção e remoção em posição arbitrária com deslocamento correto",
+        "Explico por que percorrer uma matriz por linhas é mais rápido que por colunas em Java"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar como o endereço de arr[i] é calculado e por que isso exige tamanho fixo de elemento" },
+        { "level": 2, "type": "coding", "title": "Implementar insertAt e removeAt em um int[] com deslocamento via System.arraycopy" },
+        { "level": 2, "type": "bug_hunt", "title": "Corrigir um laço de remoção em array que pula elementos e gera ArrayIndexOutOfBoundsException" },
+        { "level": 3, "type": "experiment", "title": "Comparar o tempo de percorrer int[][] por linhas versus por colunas e explicar o resultado pelo cache" },
+        { "level": 3, "type": "experiment", "title": "Medir a diferença de desempenho entre somar int[] e Integer[] com 10 milhões de elementos" },
+        { "level": 4, "type": "implementation", "title": "Implementar uma matriz esparsa e uma matriz densa em array unidimensional (row-major) e comparar memória e tempo de acesso" }
+      ]
+    },
+    "2.1.5": {
+      "summary": "Array dinâmico (ArrayList) que cresce realocando um array interno maior e copiando os elementos. A análise amortizada mostra por que append continua O(1) em média, e entender capacidade, fator de crescimento e cópias evita armadilhas de desempenho.",
+      "objectives": [
+        "Explicar a diferença entre size e capacity e o processo de crescimento por realocação e cópia",
+        "Demonstrar com análise amortizada (método agregado ou do banqueiro) que append é O(1) amortizado",
+        "Explicar por que crescimento por fator multiplicativo é necessário e o que acontece com crescimento aditivo",
+        "Descrever a implementação do ArrayList do Java (fator 1,5, ensureCapacity, trimToSize, modCount e fail-fast)",
+        "Identificar o custo de remove(0), add(0, x) e remoção durante iteração"
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        { "key": "2.1.4", "kind": "required", "reason": "O array dinâmico é construído sobre um array de tamanho fixo" },
+        { "key": "2.1.1", "kind": "recommended", "reason": "A análise amortizada é central para justificar o custo de append" }
+      ],
+      "checklist": [
+        "Provo que n appends custam O(n) no total com crescimento por dobra",
+        "Implemento um array dinâmico genérico com crescimento e encolhimento sem thrashing",
+        "Explico quando usar new ArrayList<>(capacidade) e o ganho obtido",
+        "Explico a origem de ConcurrentModificationException em iteração com remoção"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar por que append em ArrayList é O(1) amortizado mesmo com cópias ocasionais O(n)" },
+        { "level": 2, "type": "implementation", "title": "Implementar DynamicArray<T> com add, get, set, remove, crescimento por fator e encolhimento" },
+        { "level": 2, "type": "bug_hunt", "title": "Corrigir um código que remove elementos de ArrayList dentro de for-each e lança ConcurrentModificationException" },
+        { "level": 3, "type": "experiment", "title": "Comparar o tempo de inserir 10 milhões de elementos com crescimento aditivo (+10) versus multiplicativo (×1,5)" },
+        { "level": 3, "type": "code_analysis", "title": "Ler o código-fonte de ArrayList.grow no JDK e explicar o cálculo da nova capacidade" },
+        { "level": 4, "type": "interview", "title": "Explicar por que encolher a capacidade pela metade quando size = capacity/2 causa thrashing e como evitar" }
+      ]
+    },
+    "2.1.6": {
+      "summary": "Lista ligada como cadeia de nós alocados separadamente e ligados por referências, com variações simples, dupla e circular. Aqui o foco é a estrutura em si: custos de cada operação, overhead de memória e por que, na prática, ela costuma perder para arrays por causa do cache.",
+      "objectives": [
+        "Implementar listas simples e duplamente ligadas com nós sentinela (dummy head/tail)",
+        "Analisar o custo de inserção, remoção e busca em cada posição, distinguindo 'remover dado o nó' de 'remover dado o valor'",
+        "Explicar o overhead de memória por nó e o efeito de ponteiros espalhados no heap sobre o cache",
+        "Descrever como java.util.LinkedList é implementada (duplamente ligada, implementa List e Deque)",
+        "Justificar com dados quando LinkedList é ou não preferível a ArrayList"
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        { "key": "1.1.8", "kind": "recommended", "reason": "Cada nó é um objeto alocado individualmente no heap" },
+        { "key": "1.1.6", "kind": "recommended", "reason": "Referências entre nós são, conceitualmente, endereços de memória" },
+        { "key": "2.1.4", "kind": "recommended", "reason": "Comparar com o layout contíguo do array é essencial para entender os custos" }
+      ],
+      "checklist": [
+        "Implemento lista duplamente ligada com addFirst, addLast, remove(nó) e iteração sem vazamento de referências",
+        "Explico por que get(i) em LinkedList é O(n) e por que isso torna for indexado O(n²)",
+        "Apresento medição mostrando ArrayList vencendo LinkedList em iteração e inserção no fim"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Comparar lista ligada e array quanto a acesso, inserção, memória e localidade de cache" },
+        { "level": 2, "type": "implementation", "title": "Implementar uma DoublyLinkedList<T> com nós sentinela e Iterator próprio" },
+        { "level": 2, "type": "bug_hunt", "title": "Encontrar o erro de atualização de ponteiros que corrompe a lista ao remover o último nó" },
+        { "level": 3, "type": "experiment", "title": "Medir iteração e inserção no meio em ArrayList versus LinkedList com 1 milhão de elementos" },
+        { "level": 3, "type": "code_analysis", "title": "Identificar por que um for indexado sobre LinkedList com get(i) é O(n²) e reescrevê-lo" },
+        { "level": 4, "type": "implementation", "title": "Implementar uma lista ligada com free list própria (pool de nós em arrays paralelos) e comparar com java.util.LinkedList" }
+      ]
+    },
+    "2.1.7": {
+      "summary": "Stack como tipo abstrato LIFO com push, pop e peek em O(1), implementável sobre array ou lista ligada. O tópico cobre a estrutura em si, sua relação com a call stack e por que em Java se usa ArrayDeque em vez da classe legada Stack.",
+      "objectives": [
+        "Definir a interface LIFO e as invariantes de push, pop e peek",
+        "Implementar stack sobre array dinâmico e sobre lista ligada, comparando custos",
+        "Relacionar a estrutura stack com a call stack de execução e com a conversão de recursão em iteração",
+        "Explicar por que java.util.Stack (herda de Vector, sincronizada) é desaconselhada e ArrayDeque é a escolha padrão",
+        "Tratar corretamente underflow e overflow"
+      ],
+      "estimatedMinutes": 45,
+      "prerequisites": [
+        { "key": "1.1.7", "kind": "recommended", "reason": "A região de memória stack é a aplicação mais conhecida da estrutura LIFO" },
+        { "key": "2.1.5", "kind": "recommended", "reason": "A implementação mais eficiente usa array dinâmico" }
+      ],
+      "checklist": [
+        "Implemento stack genérica sobre array com crescimento e tratamento de pilha vazia",
+        "Explico a diferença entre a estrutura stack e a região stack de memória",
+        "Justifico o uso de Deque<T> stack = new ArrayDeque<>() em código Java"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar a relação e a diferença entre a estrutura de dados stack e a call stack" },
+        { "level": 2, "type": "implementation", "title": "Implementar ArrayStack<T> com push, pop, peek e isEmpty, lançando exceção em underflow" },
+        { "level": 2, "type": "coding", "title": "Converter uma travessia recursiva de árvore em iterativa usando uma stack explícita" },
+        { "level": 3, "type": "experiment", "title": "Comparar o desempenho de java.util.Stack e ArrayDeque em 10 milhões de push/pop" },
+        { "level": 3, "type": "interview", "title": "Responder por que a documentação do Java recomenda Deque em vez de Stack" },
+        { "level": 4, "type": "project", "title": "Construir um editor de texto de linha com undo/redo usando duas stacks" }
+      ]
+    },
+    "2.1.8": {
+      "summary": "Queue como tipo abstrato FIFO com enqueue e dequeue em O(1), implementável com buffer circular ou lista ligada. Entender o buffer circular e as interfaces Queue do Java é base para BFS, filas de tarefas e sistemas produtor-consumidor.",
+      "objectives": [
+        "Definir a interface FIFO e as operações offer, poll e peek",
+        "Implementar queue com array circular, controlando head, tail e size com aritmética modular",
+        "Explicar por que remover do início de um array comum é O(n) e como o buffer circular resolve isso",
+        "Diferenciar os métodos que lançam exceção (add/remove/element) dos que retornam valor especial (offer/poll/peek) na interface Queue",
+        "Conhecer o papel de BlockingQueue em sistemas concorrentes e de filas em servidores reais"
+      ],
+      "estimatedMinutes": 50,
+      "prerequisites": [
+        { "key": "2.1.4", "kind": "recommended", "reason": "O buffer circular é um array com índices modulares" }
+      ],
+      "checklist": [
+        "Implemento um buffer circular com crescimento sem perder a ordem dos elementos",
+        "Explico a diferença entre offer/poll e add/remove em Java",
+        "Distingo fila cheia de fila vazia sem desperdiçar posição ou com contador explícito"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar por que usar ArrayList.remove(0) como fila é O(n) por operação" },
+        { "level": 2, "type": "implementation", "title": "Implementar CircularQueue<T> com crescimento que reorganiza os elementos na ordem correta" },
+        { "level": 2, "type": "bug_hunt", "title": "Corrigir a condição de fila cheia/vazia em um buffer circular que perde elementos" },
+        { "level": 3, "type": "coding", "title": "Implementar uma fila usando duas stacks e provar que dequeue é O(1) amortizado" },
+        { "level": 4, "type": "project", "title": "Construir um simulador produtor-consumidor com ArrayBlockingQueue e medir throughput com diferentes capacidades" }
+      ]
+    },
+    "2.1.9": {
+      "summary": "Deque (double-ended queue) permite inserção e remoção em O(1) nas duas pontas, servindo como stack e queue ao mesmo tempo. Em Java, ArrayDeque implementa um buffer circular redimensionável e é a estrutura padrão para pilhas, filas e janelas deslizantes.",
+      "objectives": [
+        "Definir as operações de deque e mostrar como ele generaliza stack e queue",
+        "Implementar um deque com buffer circular e crescimento",
+        "Explicar a implementação de ArrayDeque (capacidade, índices head/tail, proibição de null)",
+        "Comparar ArrayDeque e LinkedList como Deque em memória e desempenho",
+        "Identificar problemas que exigem deque, como monotonic queue em sliding window maximum"
+      ],
+      "estimatedMinutes": 50,
+      "prerequisites": [
+        { "key": "2.1.7", "kind": "recommended", "reason": "Deque generaliza a stack" },
+        { "key": "2.1.8", "kind": "recommended", "reason": "Deque generaliza a queue e reutiliza o buffer circular" }
+      ],
+      "checklist": [
+        "Implemento deque circular com addFirst/addLast/pollFirst/pollLast em O(1)",
+        "Explico por que ArrayDeque não aceita null",
+        "Escolho corretamente entre push/pop e offer/poll ao usar ArrayDeque como stack ou queue"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Mostrar como um deque pode emular stack e queue e quais métodos de ArrayDeque correspondem a cada uso" },
+        { "level": 2, "type": "implementation", "title": "Implementar ArrayDequeLite<T> com buffer circular, crescimento e as quatro operações de ponta" },
+        { "level": 2, "type": "bug_hunt", "title": "Encontrar o erro em código que mistura push e offer no mesmo ArrayDeque e inverte a ordem esperada" },
+        { "level": 3, "type": "experiment", "title": "Comparar ArrayDeque e LinkedList como fila em throughput e consumo de memória" },
+        { "level": 3, "type": "code_analysis", "title": "Ler o código de ArrayDeque no JDK e explicar como os índices circulam e como ocorre o resize" },
+        { "level": 4, "type": "implementation", "title": "Implementar um histórico de navegação com limite de tamanho usando deque, descartando as entradas mais antigas" }
+      ]
+    },
+    "2.2.1": {
+      "summary": "Busca linear percorre a coleção elemento a elemento até encontrar o alvo, sem exigir ordenação. É o baseline de toda busca e, por localidade de cache e ausência de pré-processamento, frequentemente é a melhor opção para coleções pequenas ou buscas únicas.",
+      "objectives": [
+        "Implementar busca linear retornando índice, primeira e última ocorrência",
+        "Analisar melhor, pior e caso médio da busca linear",
+        "Explicar quando busca linear vence alternativas (n pequeno, busca única, dados não ordenados)",
+        "Aplicar a técnica de sentinela e explicar seu ganho",
+        "Reconhecer buscas lineares escondidas em APIs (List.contains, indexOf, String.indexOf)"
+      ],
+      "estimatedMinutes": 30,
+      "prerequisites": [
+        { "key": "2.1.4", "kind": "recommended", "reason": "A busca linear percorre arrays sequencialmente" }
+      ],
+      "checklist": [
+        "Implemento variações de busca linear com predicado genérico",
+        "Explico quando ordenar para depois usar busca binária compensa em relação a k buscas lineares",
+        "Identifico List.contains dentro de laço como causa de O(n²)"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Calcular o número esperado de comparações da busca linear quando o alvo está em posição uniforme" },
+        { "level": 2, "type": "coding", "title": "Implementar findFirst e findLast genéricos com Predicate<T>" },
+        { "level": 2, "type": "code_analysis", "title": "Encontrar a busca linear escondida que torna O(n²) a remoção de duplicatas com List.contains" },
+        { "level": 3, "type": "interview", "title": "Decidir, dado o número k de consultas, quando vale ordenar (O(n log n)) e usar busca binária" },
+        { "level": 3, "type": "experiment", "title": "Medir busca linear versus binária para n de 8 a 1 milhão e encontrar o ponto de cruzamento" },
+        { "level": 4, "type": "implementation", "title": "Implementar busca linear com sentinela e versão com laço desenrolado, comparando tempo com JMH" }
+      ]
+    },
+    "2.2.2": {
+      "summary": "Busca binária descarta metade do espaço de busca a cada comparação em um array ordenado, alcançando O(log n). Aqui o foco é o algoritmo em si: invariantes, variações lower/upper bound e os erros clássicos de borda e overflow.",
+      "objectives": [
+        "Implementar busca binária com intervalo fechado [lo, hi] e semiaberto [lo, hi) mantendo invariantes explícitas",
+        "Implementar lower bound e upper bound para encontrar primeira e última ocorrência",
+        "Explicar o bug de overflow em (lo + hi) / 2 e corrigi-lo com lo + (hi - lo) / 2 ou >>>",
+        "Provar a terminação e a corretude por meio da invariante do laço",
+        "Usar Arrays.binarySearch e Collections.binarySearch e interpretar o retorno negativo (-(ponto de inserção) - 1)"
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        { "key": "2.2.1", "kind": "recommended", "reason": "A busca binária é a otimização da busca linear quando há ordenação" },
+        { "key": "2.1.3", "kind": "recommended", "reason": "Entender O(log n) é central para justificar o algoritmo" }
+      ],
+      "checklist": [
+        "Escrevo lower bound sem consulta e sem laço infinito em todos os casos de borda",
+        "Explico a invariante que mantém minha implementação correta",
+        "Interpreto corretamente o retorno negativo de Arrays.binarySearch",
+        "Testo arrays vazios, de um elemento, com duplicatas e alvo fora do intervalo"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar por que a busca binária é O(log n) e quantas iterações faz para n = 10^9" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Binary Search' (LeetCode 704) com intervalo fechado e semiaberto" },
+        { "level": 2, "type": "bug_hunt", "title": "Corrigir uma busca binária que entra em laço infinito quando lo = mid e falha com overflow em arrays grandes" },
+        { "level": 3, "type": "coding", "title": "Resolver 'Find First and Last Position of Element in Sorted Array' com lower e upper bound" },
+        { "level": 3, "type": "code_analysis", "title": "Analisar a implementação de Arrays.binarySearch no JDK e explicar o retorno -(insertion point) - 1" },
+        { "level": 4, "type": "implementation", "title": "Implementar uma busca binária genérica parametrizada por predicado monotônico e cobri-la com testes de propriedade" }
+      ]
+    },
+    "2.2.3": {
+      "summary": "Visão geral dos algoritmos de ordenação (bubble, selection, insertion, quick, heap, counting) e das propriedades que os distinguem: tempo, espaço, estabilidade e adaptatividade. Inclui o limite inferior Ω(n log n) para ordenação por comparação e as escolhas do Java (Dual-Pivot Quicksort e TimSort).",
+      "objectives": [
+        "Implementar insertion sort, selection sort e quicksort, explicando a invariante de cada um",
+        "Comparar algoritmos quanto a tempo (melhor/médio/pior), espaço, estabilidade e comportamento em dados quase ordenados",
+        "Explicar o limite inferior Ω(n log n) para ordenação por comparação e quando counting/radix sort o superam",
+        "Explicar por que Arrays.sort usa Dual-Pivot Quicksort para primitivos e TimSort para objetos",
+        "Implementar Comparator corretos e reconhecer violações do contrato (ex.: comparação por subtração com overflow)"
+      ],
+      "estimatedMinutes": 120,
+      "prerequisites": [
+        { "key": "2.1.3", "kind": "recommended", "reason": "Comparar algoritmos de ordenação exige notação assintótica" },
+        { "key": "2.1.4", "kind": "recommended", "reason": "Ordenações in-place manipulam índices de arrays" }
+      ],
+      "checklist": [
+        "Implemento quicksort com partição de Lomuto ou Hoare e explico o pior caso",
+        "Explico estabilidade com um exemplo em que ela importa (ordenar por múltiplos critérios)",
+        "Justifico por que Java usa algoritmos diferentes para int[] e Object[]",
+        "Escrevo Comparators sem overflow usando Integer.compare ou Comparator.comparing"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar estabilidade de ordenação e por que TimSort é estável e quicksort não" },
+        { "level": 2, "type": "implementation", "title": "Implementar insertion sort e quicksort com pivô aleatório e testar com entradas adversariais" },
+        { "level": 2, "type": "bug_hunt", "title": "Corrigir um Comparator que usa a - b e produz ordenação errada com valores extremos" },
+        { "level": 3, "type": "coding", "title": "Resolver 'Sort Colors' (Dutch National Flag) em uma passada com espaço O(1)" },
+        { "level": 3, "type": "experiment", "title": "Comparar quicksort ingênuo, Arrays.sort e insertion sort em dados aleatórios, ordenados e quase ordenados" },
+        { "level": 4, "type": "implementation", "title": "Implementar counting sort para inteiros em faixa limitada e comparar com Arrays.sort" }
+      ]
+    },
+    "2.2.4": {
+      "summary": "Merge Sort divide o array ao meio, ordena cada metade recursivamente e intercala os resultados, garantindo O(n log n) no pior caso e estabilidade ao custo de O(n) de espaço auxiliar. É o exemplo canônico de divisão e conquista e a base do TimSort.",
+      "objectives": [
+        "Implementar merge sort top-down recursivo e bottom-up iterativo",
+        "Implementar a etapa de merge de forma estável e com um único buffer auxiliar",
+        "Derivar o custo O(n log n) pela árvore de recursão e pela recorrência T(n) = 2T(n/2) + O(n)",
+        "Explicar o custo de espaço O(n) e por que merge sort é preferido para listas ligadas e ordenação externa",
+        "Relacionar merge sort com TimSort (runs naturais, galloping, insertion sort em runs pequenas)"
+      ],
+      "estimatedMinutes": 90,
+      "prerequisites": [
+        { "key": "2.2.3", "kind": "recommended", "reason": "Merge sort é comparado com os demais algoritmos de ordenação" }
+      ],
+      "checklist": [
+        "Implemento merge sort estável que aloca o buffer uma única vez",
+        "Desenho a árvore de recursão e justifico O(n log n)",
+        "Uso o merge para resolver um problema derivado (contagem de inversões ou merge de listas)"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar por que merge sort é O(n log n) em todos os casos usando a árvore de recursão" },
+        { "level": 2, "type": "implementation", "title": "Implementar merge sort top-down com buffer auxiliar único e versão bottom-up iterativa" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Merge Sorted Array' (LeetCode 88) in-place preenchendo de trás para frente" },
+        { "level": 3, "type": "coding", "title": "Contar inversões de um array em O(n log n) adaptando a etapa de merge" },
+        { "level": 3, "type": "coding", "title": "Resolver 'Sort List' (LeetCode 148) com merge sort em lista ligada" },
+        { "level": 4, "type": "project", "title": "Implementar ordenação externa: ordenar um arquivo maior que a memória dividindo em chunks e fazendo k-way merge" }
+      ]
+    },
+    "2.2.5": {
+      "summary": "Recursão resolve um problema reduzindo-o a instâncias menores de si mesmo até um caso base. Entender como cada chamada ocupa um frame na call stack explica custo de espaço, StackOverflowError e como converter recursão em iteração.",
+      "objectives": [
+        "Identificar caso base, passo recursivo e garantia de progresso em funções recursivas",
+        "Rastrear a execução de uma recursão desenhando a call stack e a árvore de chamadas",
+        "Calcular tempo e espaço de recursões lineares e com múltiplas chamadas (ex.: Fibonacci ingênuo O(2^n))",
+        "Explicar por que a JVM não faz eliminação de tail call e como isso afeta recursões profundas",
+        "Converter uma recursão em iteração com stack explícita"
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        { "key": "1.1.9", "kind": "required", "reason": "Sem entender a call stack não é possível raciocinar sobre o custo e os limites da recursão" },
+        { "key": "2.1.7", "kind": "recommended", "reason": "A conversão de recursão em iteração usa uma stack explícita" }
+      ],
+      "checklist": [
+        "Desenho a árvore de chamadas de Fibonacci ingênuo e explico o custo exponencial",
+        "Provoco e explico um StackOverflowError controlado e ajusto -Xss para observar o efeito",
+        "Reescrevo uma função recursiva como iterativa mantendo o mesmo resultado"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar o que acontece na call stack em cada chamada de factorial(4)" },
+        { "level": 2, "type": "coding", "title": "Implementar recursivamente potência rápida (Pow(x, n)) em O(log n) tratando expoente negativo" },
+        { "level": 2, "type": "bug_hunt", "title": "Encontrar a recursão sem progresso que causa StackOverflowError em uma soma de dígitos" },
+        { "level": 3, "type": "experiment", "title": "Medir a profundidade máxima de recursão na JVM com diferentes valores de -Xss" },
+        { "level": 3, "type": "coding", "title": "Resolver 'Reverse Linked List' recursivamente e iterativamente, comparando o espaço" },
+        { "level": 4, "type": "implementation", "title": "Implementar um avaliador recursivo de expressões aritméticas com parênteses (recursive descent parser)" }
+      ]
+    },
+    "2.2.6": {
+      "summary": "Divisão e conquista quebra o problema em subproblemas independentes, resolve-os recursivamente e combina as soluções. O tópico cobre como modelar o custo com recorrências, resolvê-las pelo Teorema Mestre e reconhecer quando a técnica se aplica.",
+      "objectives": [
+        "Identificar as três fases (dividir, conquistar, combinar) em merge sort, quicksort e busca binária",
+        "Escrever a recorrência de custo de um algoritmo de divisão e conquista",
+        "Resolver recorrências com árvore de recursão e com o Teorema Mestre",
+        "Distinguir divisão e conquista (subproblemas independentes) de programação dinâmica (subproblemas sobrepostos)",
+        "Aplicar a técnica a problemas novos (maximum subarray, closest pair, quickselect)"
+      ],
+      "estimatedMinutes": 90,
+      "prerequisites": [
+        { "key": "2.2.5", "kind": "required", "reason": "Divisão e conquista é implementada por recursão" },
+        { "key": "2.2.4", "kind": "recommended", "reason": "Merge sort é o exemplo canônico da técnica" }
+      ],
+      "checklist": [
+        "Resolvo 5 recorrências pelo Teorema Mestre identificando o caso correto",
+        "Explico por que quickselect é O(n) no caso médio e O(n²) no pior",
+        "Explico a diferença entre divisão e conquista e programação dinâmica com exemplo"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Identificar dividir, conquistar e combinar em merge sort, quicksort e busca binária" },
+        { "level": 2, "type": "code_analysis", "title": "Resolver pelo Teorema Mestre T(n) = 2T(n/2) + n, T(n) = T(n/2) + 1 e T(n) = 3T(n/2) + n" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Maximum Subarray' com divisão e conquista em O(n log n) e comparar com Kadane" },
+        { "level": 3, "type": "coding", "title": "Resolver 'Kth Largest Element in an Array' com quickselect e analisar o caso médio" },
+        { "level": 4, "type": "experiment", "title": "Paralelizar merge sort com ForkJoinPool e medir speedup em relação à versão sequencial" }
+      ]
+    },
+    "2.3.1": {
+      "summary": "Padrões de entrevista com listas ligadas: fast/slow pointers, dummy node, reversão in-place e merge. O foco não é a estrutura, mas reconhecer no enunciado qual técnica de manipulação de ponteiros resolve o problema em O(n) e O(1) de espaço.",
+      "objectives": [
+        "Aplicar fast/slow pointers para detectar ciclo, encontrar o meio e o n-ésimo nó a partir do fim",
+        "Reverter lista ligada (inteira ou em sublista) in-place sem perder referências",
+        "Usar dummy node para eliminar casos especiais na cabeça da lista",
+        "Explicar matematicamente por que o algoritmo de Floyd encontra o início do ciclo",
+        "Combinar técnicas em problemas compostos (ex.: palíndromo = meio + reversão + comparação)"
+      ],
+      "estimatedMinutes": 120,
+      "prerequisites": [
+        { "key": "2.1.6", "kind": "recommended", "reason": "Os padrões assumem domínio da estrutura de lista ligada e de seus ponteiros" }
+      ],
+      "checklist": [
+        "Resolvo Reverse Linked List, Linked List Cycle e Merge Two Sorted Lists em menos de 15 minutos cada",
+        "Explico a prova do algoritmo de Floyd para encontrar o início do ciclo",
+        "Reconheço quando usar dummy node e fast/slow pointers apenas pela leitura do enunciado"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar por que fast/slow pointers sempre se encontram se houver ciclo e por que o encontro ocorre em O(n)" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Linked List Cycle II' com o algoritmo de Floyd em O(1) de espaço" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Remove Nth Node From End of List' em uma passada com dummy node e dois ponteiros" },
+        { "level": 3, "type": "coding", "title": "Resolver 'Palindrome Linked List' em O(n) tempo e O(1) espaço combinando meio e reversão" },
+        { "level": 3, "type": "coding", "title": "Resolver 'Reorder List' (L0→Ln→L1→Ln-1...) in-place" },
+        { "level": 4, "type": "interview", "title": "Simular entrevista resolvendo 'Reverse Nodes in k-Group' explicando o raciocínio em voz alta" }
+      ]
+    },
+    "2.3.2": {
+      "summary": "Padrões de entrevista que usam stack: casamento de delimitadores, avaliação de expressões, monotonic stack para 'próximo maior/menor' e simulação de processos LIFO. O foco é reconhecer quando a natureza do problema é 'último aberto, primeiro fechado'.",
+      "objectives": [
+        "Reconhecer sinais de problema de stack: aninhamento, desfazer, próximo maior/menor elemento",
+        "Aplicar monotonic stack para resolver 'next greater element' em O(n) e justificar o custo amortizado",
+        "Avaliar expressões em notação polonesa reversa e com precedência de operadores",
+        "Projetar stacks auxiliares para operações em O(1), como getMin",
+        "Usar ArrayDeque como stack em Java de forma idiomática"
+      ],
+      "estimatedMinutes": 120,
+      "prerequisites": [
+        { "key": "2.1.7", "kind": "recommended", "reason": "Os padrões pressupõem a estrutura stack e suas operações O(1)" }
+      ],
+      "checklist": [
+        "Resolvo Valid Parentheses e Min Stack sem consulta",
+        "Explico por que monotonic stack é O(n) mesmo com o while interno",
+        "Resolvo Daily Temperatures e Largest Rectangle in Histogram identificando o invariante da pilha"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar a invariante de uma monotonic stack decrescente e por que cada elemento entra e sai uma única vez" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Valid Parentheses' com ArrayDeque tratando os casos de borda" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Min Stack' com getMin em O(1)" },
+        { "level": 3, "type": "coding", "title": "Resolver 'Daily Temperatures' com monotonic stack em O(n)" },
+        { "level": 3, "type": "coding", "title": "Resolver 'Evaluate Reverse Polish Notation' e estender para expressões infixas com Shunting Yard" },
+        { "level": 4, "type": "interview", "title": "Resolver 'Largest Rectangle in Histogram' em O(n) explicando o raciocínio em voz alta" }
+      ]
+    },
+    "2.3.3": {
+      "summary": "Padrões de entrevista com filas: processamento em ordem de chegada, BFS por níveis, simulações temporais e monotonic queue para máximos em janelas. O foco é reconhecer problemas em que a ordem FIFO ou a exploração por camadas é a chave.",
+      "objectives": [
+        "Reconhecer problemas de fila: processamento por níveis, simulação por tempo, 'mais recentes dentro de uma janela'",
+        "Aplicar BFS por níveis usando o tamanho da fila no início de cada nível",
+        "Usar monotonic deque para máximo/mínimo de janela deslizante em O(n)",
+        "Implementar estruturas derivadas, como stack com filas e fila com stacks",
+        "Escolher entre Queue, Deque e PriorityQueue conforme a ordem de processamento exigida"
+      ],
+      "estimatedMinutes": 90,
+      "prerequisites": [
+        { "key": "2.1.8", "kind": "recommended", "reason": "Os padrões pressupõem a estrutura queue e o buffer circular" },
+        { "key": "2.1.9", "kind": "recommended", "reason": "A monotonic queue é implementada sobre um deque" }
+      ],
+      "checklist": [
+        "Resolvo Implement Queue using Stacks e Number of Recent Calls sem consulta",
+        "Resolvo Sliding Window Maximum em O(n) com deque e explico a invariante",
+        "Uso o padrão 'size do nível' para processar BFS por camadas"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar por que a ordem FIFO garante que BFS visite os nós em ordem de distância" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Implement Queue using Stacks' com operações O(1) amortizadas" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Number of Recent Calls' com fila descartando eventos fora da janela" },
+        { "level": 3, "type": "coding", "title": "Resolver 'Sliding Window Maximum' com monotonic deque em O(n)" },
+        { "level": 3, "type": "coding", "title": "Resolver 'Rotting Oranges' com BFS multi-fonte contando minutos por nível" },
+        { "level": 4, "type": "project", "title": "Construir um rate limiter de janela deslizante (N requisições por segundo) baseado em fila de timestamps" }
+      ]
+    },
+    "2.3.4": {
+      "summary": "Padrões de entrevista com busca binária além do array ordenado: arrays rotacionados, busca do primeiro elemento que satisfaz um predicado monotônico e 'binary search on answer'. O foco é reconhecer monotonicidade escondida no enunciado.",
+      "objectives": [
+        "Reformular problemas como 'encontrar o primeiro x em que predicado(x) é verdadeiro'",
+        "Aplicar busca binária em arrays rotacionados identificando qual metade está ordenada",
+        "Aplicar 'binary search on answer' em problemas de minimizar o máximo ou capacidade mínima",
+        "Escolher o espaço de busca (índices ou valores) e seus limites corretamente",
+        "Analisar o custo total como O(log(intervalo) × custo do predicado)"
+      ],
+      "estimatedMinutes": 120,
+      "prerequisites": [
+        { "key": "2.2.2", "kind": "recommended", "reason": "Os padrões assumem domínio da implementação e das invariantes da busca binária" }
+      ],
+      "checklist": [
+        "Resolvo Search in Rotated Sorted Array e Find Minimum in Rotated Sorted Array sem erros de borda",
+        "Resolvo Koko Eating Bananas identificando o predicado monotônico",
+        "Explico como reconheço que um problema admite busca binária na resposta"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar o que é um predicado monotônico e por que ele permite busca binária sobre valores" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Search Insert Position' usando o template de lower bound" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Find Minimum in Rotated Sorted Array' em O(log n)" },
+        { "level": 3, "type": "coding", "title": "Resolver 'Search in Rotated Sorted Array' identificando a metade ordenada a cada passo" },
+        { "level": 3, "type": "coding", "title": "Resolver 'Koko Eating Bananas' com busca binária na resposta" },
+        { "level": 4, "type": "interview", "title": "Resolver 'Capacity To Ship Packages Within D Days' explicando a escolha dos limites do espaço de busca" }
+      ]
+    },
+    "2.3.5": {
+      "summary": "Padrões de entrevista que usam heap/priority queue como ferramenta: top-k elementos, k-ésimo maior, merge de k listas ordenadas e two heaps para mediana em fluxo. O foco é reconhecer quando é preciso acesso repetido ao mínimo/máximo de um conjunto dinâmico; o funcionamento interno do heap é aprofundado em 2.4.7 e 2.4.8.",
+      "objectives": [
+        "Reconhecer sinais de heap no enunciado: 'k maiores', 'k-ésimo', 'mais frequente', 'mediana em fluxo', 'merge de k'",
+        "Usar PriorityQueue do Java com Comparator para min-heap e max-heap",
+        "Aplicar o truque do heap de tamanho k para top-k em O(n log k) e comparar com ordenação O(n log n)",
+        "Aplicar two heaps para manter a mediana de um fluxo em O(log n) por inserção",
+        "Fazer merge de k fluxos ordenados em O(N log k)"
+      ],
+      "estimatedMinutes": 120,
+      "prerequisites": [
+        { "key": "2.2.3", "kind": "recommended", "reason": "Comparar soluções com heap e com ordenação exige conhecer os custos de ordenar" },
+        { "key": "2.2.4", "kind": "recommended", "reason": "Merge k Sorted Lists generaliza a etapa de merge do merge sort" }
+      ],
+      "checklist": [
+        "Resolvo Kth Largest Element e Top K Frequent Elements com heap de tamanho k",
+        "Resolvo Merge k Sorted Lists e justifico O(N log k)",
+        "Implemento Find Median from Data Stream com two heaps balanceados",
+        "Explico por que usar min-heap para encontrar os k maiores"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar por que um min-heap de tamanho k encontra os k maiores elementos em O(n log k)" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Kth Largest Element in a Stream' com PriorityQueue de tamanho k" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Top K Frequent Elements' combinando HashMap e heap" },
+        { "level": 3, "type": "coding", "title": "Resolver 'Merge k Sorted Lists' com PriorityQueue e analisar O(N log k)" },
+        { "level": 3, "type": "bug_hunt", "title": "Corrigir um Comparator de max-heap escrito como (a, b) -> b - a que falha com overflow" },
+        { "level": 4, "type": "interview", "title": "Resolver 'Find Median from Data Stream' com two heaps explicando o rebalanceamento" }
+      ]
+    },
+    "2.3.6": {
+      "summary": "Padrões de problemas com intervalos: ordenar por início ou fim, mesclar sobreposições, inserir intervalos e contar recursos simultâneos com sweep line. Aparecem com frequência em entrevistas e modelam problemas reais de agenda, reservas e alocação.",
+      "objectives": [
+        "Definir formalmente sobreposição de intervalos e tratar bordas abertas/fechadas",
+        "Mesclar intervalos ordenando por início em O(n log n)",
+        "Escolher ordenar por fim em problemas gulosos de remoção mínima de sobreposições",
+        "Contar o máximo de intervalos simultâneos com sweep line ou min-heap de términos",
+        "Inserir um intervalo em lista ordenada em O(n) sem reordenar"
+      ],
+      "estimatedMinutes": 100,
+      "prerequisites": [
+        { "key": "2.2.3", "kind": "recommended", "reason": "Quase todos os problemas de intervalos começam ordenando com Comparator" },
+        { "key": "2.3.5", "kind": "recommended", "reason": "Meeting Rooms II pode ser resolvido com min-heap de horários de término" }
+      ],
+      "checklist": [
+        "Resolvo Merge Intervals e Insert Interval sem consulta",
+        "Explico por que Non-overlapping Intervals ordena por fim e não por início",
+        "Resolvo Meeting Rooms II com heap e com sweep line e comparo as abordagens"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Escrever a condição exata de sobreposição entre [a, b] e [c, d] e testar os casos de borda" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Merge Intervals' ordenando por início" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Insert Interval' em O(n) aproveitando que a entrada já está ordenada" },
+        { "level": 3, "type": "coding", "title": "Resolver 'Non-overlapping Intervals' com estratégia gulosa ordenando por fim" },
+        { "level": 3, "type": "coding", "title": "Resolver 'Meeting Rooms II' com min-heap e com sweep line" },
+        { "level": 4, "type": "project", "title": "Construir um verificador de conflitos de agenda que receba reservas e liste sobreposições e salas necessárias" }
+      ]
+    },
+    "2.4.1": {
+      "summary": "Tabela hash como estrutura que mapeia chaves para posições de um array via função de hash, obtendo busca, inserção e remoção em O(1) esperado. Cobre funções de hash, tratamento de colisões (encadeamento e endereçamento aberto), load factor, rehash e o pior caso.",
+      "objectives": [
+        "Explicar o caminho chave → hashCode → índice do bucket e as propriedades de uma boa função de hash",
+        "Comparar encadeamento separado e endereçamento aberto (linear probing, quadratic probing, double hashing)",
+        "Explicar o papel do load factor e o custo amortizado do rehash",
+        "Descrever o pior caso O(n) e ataques de hash flooding",
+        "Discutir o uso de tamanhos potência de 2 versus números primos para a tabela"
+      ],
+      "estimatedMinutes": 100,
+      "prerequisites": [
+        { "key": "2.1.4", "kind": "recommended", "reason": "A tabela hash é um array indexado pelo resultado da função de hash" },
+        { "key": "2.1.5", "kind": "recommended", "reason": "O rehash usa a mesma análise amortizada do array dinâmico" },
+        { "key": "2.1.6", "kind": "recommended", "reason": "O encadeamento separado usa listas ligadas nos buckets" }
+      ],
+      "checklist": [
+        "Implemento uma tabela hash com encadeamento e rehash funcionando",
+        "Explico por que O(1) é esperado e não garantido",
+        "Comparo encadeamento e endereçamento aberto quanto a cache, remoção e load factor máximo"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar o caminho completo de uma chave até seu bucket e o que caracteriza uma colisão" },
+        { "level": 2, "type": "implementation", "title": "Implementar uma tabela hash com encadeamento separado, load factor 0,75 e rehash" },
+        { "level": 3, "type": "implementation", "title": "Implementar uma tabela hash com linear probing e tombstones para remoção" },
+        { "level": 3, "type": "experiment", "title": "Medir o comprimento médio das cadeias com uma função de hash ruim versus boa para 100 mil chaves" },
+        { "level": 3, "type": "interview", "title": "Explicar o que é hash flooding e como linguagens e frameworks se defendem dele" },
+        { "level": 4, "type": "project", "title": "Construir um benchmark comparando sua tabela hash com encadeamento, sua versão com linear probing e o HashMap do Java em diferentes load factors" }
+      ]
+    },
+    "2.4.2": {
+      "summary": "Implementação concreta de tabela hash no Java: HashMap usa array de buckets com encadeamento, espalhamento de bits do hashCode, resize com dobra de capacidade e treeification de buckets em árvores rubro-negras. Entender esses detalhes e o contrato equals/hashCode evita bugs sutis e problemas de desempenho.",
+      "objectives": [
+        "Explicar a estrutura interna do HashMap: Node[] table, hash spreading (h ^ h >>> 16) e índice (n - 1) & hash",
+        "Descrever o resize: capacidade inicial 16, load factor 0,75, threshold e redistribuição em lo/hi sem recalcular hash",
+        "Explicar a treeification (TREEIFY_THRESHOLD = 8, MIN_TREEIFY_CAPACITY = 64) e por que ela limita o pior caso a O(log n)",
+        "Aplicar corretamente o contrato equals/hashCode e reconhecer os riscos de chaves mutáveis",
+        "Comparar HashMap, LinkedHashMap, TreeMap e ConcurrentHashMap quanto a ordem, custo e concorrência"
+      ],
+      "estimatedMinutes": 120,
+      "prerequisites": [
+        { "key": "2.4.1", "kind": "required", "reason": "HashMap é uma implementação de tabela hash; os conceitos de colisão e rehash são a base" }
+      ],
+      "checklist": [
+        "Explico passo a passo o que acontece em put(k, v), incluindo colisão e resize",
+        "Demonstro com código o bug de uma chave mutável que 'desaparece' do mapa",
+        "Explico quando e por que um bucket vira árvore",
+        "Escolho entre HashMap, LinkedHashMap e TreeMap justificando por requisitos"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar por que HashMap usa (n - 1) & hash e exige capacidade potência de 2" },
+        { "level": 2, "type": "bug_hunt", "title": "Encontrar por que objetos com equals sobrescrito mas sem hashCode não são encontrados no HashMap" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Two Sum' com HashMap em O(n) e explicar o custo de cada operação" },
+        { "level": 3, "type": "code_analysis", "title": "Ler HashMap.putVal e resize no código-fonte do JDK e documentar cada ramo" },
+        { "level": 3, "type": "experiment", "title": "Forçar colisões com chaves de hashCode constante e medir o efeito da treeification com chaves Comparable" },
+        { "level": 4, "type": "implementation", "title": "Implementar um LRU Cache com LinkedHashMap (accessOrder e removeEldestEntry) e depois do zero com HashMap + lista duplamente ligada" }
+      ]
+    },
+    "2.4.3": {
+      "summary": "Conjunto sem duplicatas baseado em tabela hash; no Java, HashSet é um wrapper sobre HashMap com valor sentinela. Cobre custos, a dependência de equals/hashCode, operações de conjunto e quando preferir LinkedHashSet, TreeSet ou BitSet.",
+      "objectives": [
+        "Explicar que HashSet delega para um HashMap interno e o que isso implica em custo e memória",
+        "Implementar operações de conjunto (união, interseção, diferença) com retainAll, addAll e removeAll e analisar seus custos",
+        "Comparar HashSet, LinkedHashSet, TreeSet e BitSet quanto a ordem, custo e memória",
+        "Usar HashSet para deduplicação e verificação de pertencimento em O(1) esperado",
+        "Reconhecer quando um boolean[] ou BitSet é melhor que HashSet<Integer>"
+      ],
+      "estimatedMinutes": 50,
+      "prerequisites": [
+        { "key": "2.4.2", "kind": "recommended", "reason": "HashSet é implementado sobre HashMap" }
+      ],
+      "checklist": [
+        "Explico o que add retorna e como isso é usado para detectar duplicatas",
+        "Resolvo Contains Duplicate e Longest Consecutive Sequence com HashSet",
+        "Justifico a escolha entre HashSet, TreeSet e BitSet para um caso dado"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar como HashSet é implementado sobre HashMap e o papel do objeto PRESENT" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Contains Duplicate' e 'Intersection of Two Arrays' com HashSet" },
+        { "level": 3, "type": "coding", "title": "Resolver 'Longest Consecutive Sequence' em O(n) com HashSet" },
+        { "level": 3, "type": "experiment", "title": "Comparar memória e tempo de HashSet<Integer>, boolean[] e BitSet para 10 milhões de inteiros" },
+        { "level": 3, "type": "bug_hunt", "title": "Corrigir um HashSet que aceita 'duplicatas' por causa de objetos mutados após a inserção" },
+        { "level": 4, "type": "implementation", "title": "Implementar um conjunto de inteiros com bitset próprio (long[]) com add, contains, union e intersection" }
+      ]
+    },
+    "2.4.4": {
+      "summary": "Árvore como estrutura hierárquica acíclica com raiz, nós, arestas e subárvores. Cobre a terminologia (altura, profundidade, grau, folha), formas de representação e por que árvores modelam desde sistemas de arquivos até índices de bancos de dados.",
+      "objectives": [
+        "Definir raiz, pai, filho, folha, altura, profundidade, nível e grau com precisão",
+        "Relacionar árvore com grafo conexo acíclico (n nós, n - 1 arestas)",
+        "Representar árvores genéricas com lista de filhos e com primeiro-filho/próximo-irmão",
+        "Calcular altura, tamanho e profundidade recursivamente",
+        "Identificar árvores em sistemas reais (DOM, sistema de arquivos, B-trees em índices, AST de compiladores)"
+      ],
+      "estimatedMinutes": 45,
+      "prerequisites": [
+        { "key": "2.2.5", "kind": "recommended", "reason": "Quase todas as operações em árvores são naturalmente recursivas" }
+      ],
+      "checklist": [
+        "Defino corretamente altura e profundidade e calculo ambas em uma árvore dada",
+        "Implemento uma árvore genérica com operações de tamanho e altura",
+        "Explico por que árvores têm exatamente n - 1 arestas"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Diferenciar altura, profundidade e nível em uma árvore de exemplo" },
+        { "level": 2, "type": "implementation", "title": "Implementar TreeNode genérico com lista de filhos e métodos size e height" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Maximum Depth of N-ary Tree' recursivamente" },
+        { "level": 3, "type": "coding", "title": "Construir a árvore de diretórios a partir de uma lista de caminhos e imprimir no formato 'tree'" },
+        { "level": 3, "type": "interview", "title": "Explicar por que bancos de dados usam B-trees e não árvores binárias para índices em disco" },
+        { "level": 4, "type": "implementation", "title": "Implementar um Trie para autocompletar prefixos com insert, search e startsWith" }
+      ]
+    },
+    "2.4.5": {
+      "summary": "Árvore binária, em que cada nó tem no máximo dois filhos, e suas travessias (pre-order, in-order, post-order, level-order). Cobre formas (completa, cheia, perfeita, balanceada), relação entre altura e número de nós e implementações recursivas e iterativas.",
+      "objectives": [
+        "Implementar as quatro travessias recursivamente e iterativamente",
+        "Diferenciar árvore cheia, completa, perfeita e balanceada",
+        "Relacionar altura e número de nós (mínimo log₂(n + 1), máximo n) e o impacto disso no custo",
+        "Explicar o custo de espaço das travessias (O(h) para DFS, O(w) para BFS)",
+        "Serializar e desserializar uma árvore binária"
+      ],
+      "estimatedMinutes": 90,
+      "prerequisites": [
+        { "key": "2.4.4", "kind": "recommended", "reason": "Árvore binária é um caso particular de árvore" },
+        { "key": "2.1.7", "kind": "recommended", "reason": "Travessias iterativas usam stack explícita" },
+        { "key": "2.1.8", "kind": "recommended", "reason": "A travessia por nível usa fila" }
+      ],
+      "checklist": [
+        "Implemento as travessias in-order e pre-order iterativas sem consulta",
+        "Classifico uma árvore como cheia, completa, perfeita ou balanceada",
+        "Resolvo Invert Binary Tree e Maximum Depth of Binary Tree em poucos minutos"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Escrever a ordem de visita das quatro travessias para uma árvore dada" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Binary Tree Inorder Traversal' de forma iterativa com stack" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Invert Binary Tree' e 'Maximum Depth of Binary Tree'" },
+        { "level": 3, "type": "coding", "title": "Resolver 'Serialize and Deserialize Binary Tree' com pre-order e marcadores de nulo" },
+        { "level": 3, "type": "experiment", "title": "Medir a profundidade de recursão das travessias em árvore degenerada versus balanceada com 100 mil nós" },
+        { "level": 4, "type": "project", "title": "Construir um visualizador de árvores binárias no terminal a partir de uma serialização em level-order" }
+      ]
+    },
+    "2.4.6": {
+      "summary": "Binary Search Tree mantém a invariante esquerda < nó < direita, permitindo busca, inserção e remoção em O(h). Cobre as operações, o problema da degeneração em lista, a ideia de autobalanceamento (AVL, rubro-negra) e como TreeMap/TreeSet usam árvores rubro-negras.",
+      "objectives": [
+        "Implementar busca, inserção, remoção (incluindo nó com dois filhos via sucessor) e mínimo/máximo",
+        "Explicar por que a travessia in-order de uma BST produz os elementos ordenados",
+        "Explicar por que a altura determina o custo e como entradas ordenadas degeneram a árvore",
+        "Descrever em alto nível rotações e as garantias de AVL e árvores rubro-negras",
+        "Usar TreeMap/TreeSet (floorKey, ceilingKey, headMap, subMap) e comparar com HashMap"
+      ],
+      "estimatedMinutes": 110,
+      "prerequisites": [
+        { "key": "2.4.5", "kind": "required", "reason": "BST é uma árvore binária com invariante de ordenação" },
+        { "key": "2.2.2", "kind": "recommended", "reason": "A busca em BST segue a mesma lógica de descartar metade do espaço" }
+      ],
+      "checklist": [
+        "Implemento remoção em BST tratando os três casos corretamente",
+        "Resolvo Validate Binary Search Tree sem cair na armadilha de comparar só com os filhos",
+        "Demonstro a degeneração inserindo dados ordenados e medindo a altura",
+        "Uso TreeMap.floorKey/ceilingKey para resolver um problema de consulta por faixa"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar por que inserir dados ordenados transforma uma BST em lista ligada e o custo resultante" },
+        { "level": 2, "type": "implementation", "title": "Implementar BST<K extends Comparable<K>> com insert, search, delete e inorder" },
+        { "level": 2, "type": "bug_hunt", "title": "Corrigir um isValidBST que compara apenas com os filhos diretos e aceita árvores inválidas" },
+        { "level": 3, "type": "coding", "title": "Resolver 'Kth Smallest Element in a BST' e 'Lowest Common Ancestor of a BST'" },
+        { "level": 3, "type": "coding", "title": "Resolver 'My Calendar I' usando TreeMap.floorKey e ceilingKey" },
+        { "level": 4, "type": "implementation", "title": "Implementar uma árvore AVL com rotações simples e duplas e verificar a altura após 1 milhão de inserções ordenadas" }
+      ]
+    },
+    "2.4.7": {
+      "summary": "Heap binário como árvore completa armazenada em array, com a propriedade de heap (pai ≤ filhos no min-heap). Aqui o foco é a estrutura em si: índices pai/filho, sift-up, sift-down, heapify em O(n) e heapsort; os padrões de uso em entrevista foram vistos em 2.3.5. Não confundir com a região heap de memória.",
+      "objectives": [
+        "Explicar a representação em array e as fórmulas de índices pai = (i - 1) / 2 e filhos = 2i + 1, 2i + 2",
+        "Implementar insert com sift-up e extract com sift-down, justificando O(log n)",
+        "Provar que build-heap (heapify bottom-up) é O(n) e não O(n log n)",
+        "Implementar heapsort e analisar por que ele é in-place, O(n log n) e não estável",
+        "Diferenciar a estrutura de dados heap da região heap de memória"
+      ],
+      "estimatedMinutes": 90,
+      "prerequisites": [
+        { "key": "2.4.5", "kind": "recommended", "reason": "O heap é uma árvore binária completa" },
+        { "key": "2.1.4", "kind": "recommended", "reason": "A árvore é armazenada implicitamente em array" },
+        { "key": "2.3.5", "kind": "recommended", "reason": "Os padrões de uso de heap em entrevistas motivam o estudo da estrutura interna" }
+      ],
+      "checklist": [
+        "Implemento um min-heap em array com insert, peek e extractMin corretos",
+        "Explico a prova de que build-heap é O(n)",
+        "Implemento heapsort in-place",
+        "Explico por que o nome heap é usado tanto para a estrutura quanto para a memória sem relação entre eles"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar por que uma árvore completa pode ser armazenada em array sem ponteiros" },
+        { "level": 2, "type": "implementation", "title": "Implementar MinHeap com insert (sift-up), extractMin (sift-down) e crescimento do array" },
+        { "level": 2, "type": "bug_hunt", "title": "Corrigir um sift-down que troca com o filho errado e quebra a propriedade de heap" },
+        { "level": 3, "type": "conceptual", "title": "Demonstrar que heapify bottom-up é O(n) somando o trabalho por nível" },
+        { "level": 3, "type": "implementation", "title": "Implementar heapsort in-place e compará-lo com Arrays.sort" },
+        { "level": 4, "type": "implementation", "title": "Implementar um d-ary heap genérico com Comparator e medir o efeito de d em inserções e remoções" }
+      ]
+    },
+    "2.4.8": {
+      "summary": "Priority Queue como tipo abstrato em que o próximo elemento removido é o de maior prioridade, normalmente implementado com heap binário. Cobre a PriorityQueue do Java por dentro (array, Comparator, custos de remove(Object), iteração não ordenada) e alternativas como TreeSet e PriorityBlockingQueue.",
+      "objectives": [
+        "Diferenciar o tipo abstrato priority queue de sua implementação com heap",
+        "Explicar a implementação de java.util.PriorityQueue: array queue[], siftUp/siftDown, crescimento e custo de cada método",
+        "Explicar por que o iterator e toString de PriorityQueue não retornam elementos ordenados",
+        "Analisar por que remove(Object) e contains são O(n) e como contornar (lazy deletion, indexed heap)",
+        "Comparar PriorityQueue, TreeSet e PriorityBlockingQueue e casos de uso reais (schedulers, timers, Dijkstra)"
+      ],
+      "estimatedMinutes": 70,
+      "prerequisites": [
+        { "key": "2.4.7", "kind": "required", "reason": "A PriorityQueue do Java é um heap binário" }
+      ],
+      "checklist": [
+        "Explico o custo de offer, poll, peek, remove(Object) e contains na PriorityQueue",
+        "Uso Comparator para prioridade composta (ex.: prioridade e depois timestamp)",
+        "Aplico lazy deletion para atualizar prioridades sem remove(Object)"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar por que imprimir uma PriorityQueue não mostra os elementos ordenados" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Last Stone Weight' com PriorityQueue como max-heap" },
+        { "level": 2, "type": "code_analysis", "title": "Ler PriorityQueue.offer e poll no JDK e comparar com sua implementação de heap" },
+        { "level": 3, "type": "coding", "title": "Resolver 'Task Scheduler' com PriorityQueue e fila de espera" },
+        { "level": 4, "type": "project", "title": "Construir um agendador de tarefas por prioridade e horário com PriorityQueue, desempate por ordem de chegada e cancelamento com lazy deletion" }
+      ]
+    },
+    "2.4.9": {
+      "summary": "Grafo como conjunto de vértices e arestas, direcionado ou não, ponderado ou não. Cobre a terminologia, as representações (lista de adjacência, matriz de adjacência, lista de arestas) e seus custos, base para os algoritmos de travessia vistos em 2.6.",
+      "objectives": [
+        "Definir vértice, aresta, grau, caminho, ciclo, componente conexo, grafo direcionado, ponderado, denso e esparso",
+        "Implementar grafo com lista de adjacência e com matriz de adjacência",
+        "Comparar as representações em espaço (O(V + E) versus O(V²)) e no custo de verificar aresta e listar vizinhos",
+        "Converter entradas típicas de problemas (lista de arestas, grid, pares de dependência) em grafo",
+        "Reconhecer grafos implícitos em problemas reais (redes sociais, rotas, dependências de build)"
+      ],
+      "estimatedMinutes": 70,
+      "prerequisites": [
+        { "key": "2.4.4", "kind": "recommended", "reason": "Árvore é um caso particular de grafo e facilita a generalização" },
+        { "key": "2.4.2", "kind": "recommended", "reason": "Listas de adjacência com vértices não inteiros usam Map<V, List<V>>" }
+      ],
+      "checklist": [
+        "Construo um grafo a partir de uma lista de arestas nas duas representações",
+        "Escolho a representação adequada justificando por densidade e operações",
+        "Modelo um grid 2D como grafo implícito com vizinhos por direções"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Comparar lista e matriz de adjacência em espaço e custo de operações para grafo esparso e denso" },
+        { "level": 2, "type": "implementation", "title": "Implementar Graph<V> genérico com lista de adjacência para grafos direcionados e não direcionados" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Find the Town Judge' calculando graus de entrada e saída" },
+        { "level": 3, "type": "coding", "title": "Converter a entrada de 'Course Schedule' em grafo de dependências e calcular graus de entrada" },
+        { "level": 3, "type": "interview", "title": "Modelar como grafo um problema real (rede de amigos ou dependências de build) e justificar a representação" },
+        { "level": 4, "type": "project", "title": "Construir um carregador de grafos a partir de CSV de arestas que gere estatísticas (graus, densidade, componentes isolados)" }
+      ]
+    },
+    "2.5.1": {
+      "summary": "Padrões de entrevista com arrays: manipulação in-place, uso de índices como informação, ordenação como pré-processamento, rotação e matrizes. O foco é o raciocínio sobre problemas, aproveitando o que foi visto da estrutura array em 2.1.4.",
+      "objectives": [
+        "Aplicar manipulação in-place com ponteiro de escrita (remover duplicatas, mover zeros)",
+        "Usar o próprio array como tabela hash quando os valores estão em [1, n] (marcação por sinal ou cyclic sort)",
+        "Rotacionar arrays com a técnica das três reversões em O(1) de espaço",
+        "Percorrer matrizes em espiral, transpor e rotacionar 90° in-place",
+        "Reconhecer quando ordenar a entrada simplifica o problema e o custo disso"
+      ],
+      "estimatedMinutes": 110,
+      "prerequisites": [
+        { "key": "2.1.4", "kind": "recommended", "reason": "Os padrões assumem a compreensão do array como estrutura" },
+        { "key": "2.2.3", "kind": "recommended", "reason": "Ordenar como pré-processamento é recorrente nestes problemas" }
+      ],
+      "checklist": [
+        "Resolvo Remove Duplicates from Sorted Array e Move Zeroes in-place",
+        "Resolvo Rotate Array com O(1) de espaço",
+        "Resolvo Product of Array Except Self sem divisão em O(n)",
+        "Resolvo Spiral Matrix sem erros de borda"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar a técnica do ponteiro de escrita para filtrar arrays in-place" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Move Zeroes' e 'Remove Duplicates from Sorted Array' in-place" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Rotate Array' com três reversões" },
+        { "level": 3, "type": "coding", "title": "Resolver 'Product of Array Except Self' em O(n) sem divisão" },
+        { "level": 3, "type": "coding", "title": "Resolver 'Find All Numbers Disappeared in an Array' usando marcação por sinal" },
+        { "level": 4, "type": "interview", "title": "Resolver 'Rotate Image' e 'Spiral Matrix' explicando o tratamento das bordas" }
+      ]
+    },
+    "2.5.2": {
+      "summary": "Padrões de entrevista com strings e o comportamento de String em Java: imutabilidade, String pool, custo de concatenação, StringBuilder, char versus code point e comparação. Inclui problemas clássicos de palíndromos, anagramas e parsing.",
+      "objectives": [
+        "Explicar a imutabilidade de String, o String pool e o custo de concatenação em laço",
+        "Usar StringBuilder, toCharArray e int[26] para manipular strings eficientemente",
+        "Diferenciar char (UTF-16) de code point e reconhecer problemas com emojis e caracteres suplementares",
+        "Comparar strings corretamente (equals versus ==, compareTo, equalsIgnoreCase)",
+        "Resolver problemas de palíndromo, anagrama, reversão de palavras e parsing de números"
+      ],
+      "estimatedMinutes": 100,
+      "prerequisites": [
+        { "key": "2.5.1", "kind": "recommended", "reason": "Strings são manipuladas como arrays de caracteres nos padrões de entrevista" },
+        { "key": "2.1.1", "kind": "recommended", "reason": "É preciso enxergar o custo escondido de substring e concatenação" }
+      ],
+      "checklist": [
+        "Explico por que concatenar em laço com + pode ser O(n²) e como StringBuilder resolve",
+        "Resolvo Valid Anagram e Valid Palindrome sem consulta",
+        "Explico por que == entre Strings às vezes 'funciona' e por que não confiar nisso",
+        "Resolvo String to Integer (atoi) tratando sinal, espaços e overflow"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar a imutabilidade de String e o funcionamento do String pool" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Valid Palindrome' com dois índices ignorando caracteres não alfanuméricos" },
+        { "level": 2, "type": "bug_hunt", "title": "Corrigir comparação de Strings com == que falha para valores lidos em tempo de execução" },
+        { "level": 3, "type": "experiment", "title": "Medir concatenação com +, String.concat e StringBuilder para 100 mil iterações" },
+        { "level": 3, "type": "coding", "title": "Resolver 'String to Integer (atoi)' tratando overflow sem usar long" },
+        { "level": 3, "type": "coding", "title": "Resolver 'Reverse Words in a String' com e sem split" },
+        { "level": 4, "type": "implementation", "title": "Implementar um compressor de strings por run-length encoding (encode/decode) tratando caracteres Unicode suplementares" }
+      ]
+    },
+    "2.5.3": {
+      "summary": "Padrão de entrevista que usa HashMap/HashSet como ferramenta: contagem de frequência, busca de complemento, agrupamento por chave canônica e prefix hashing. O foco é reconhecer quando trocar espaço por tempo transforma O(n²) em O(n); o funcionamento interno das tabelas hash foi visto em 2.4.1 e 2.4.2.",
+      "objectives": [
+        "Aplicar contagem de frequência com HashMap.merge, getOrDefault ou int[] de alfabeto fixo",
+        "Aplicar o padrão 'complemento visto antes' (Two Sum) em uma única passada",
+        "Agrupar elementos por chave canônica (string ordenada ou assinatura de contagem)",
+        "Escolher entre int[26], HashMap e HashSet conforme domínio das chaves",
+        "Analisar o trade-off de espaço O(n) e os riscos do pior caso do hashing"
+      ],
+      "estimatedMinutes": 90,
+      "prerequisites": [
+        { "key": "2.4.2", "kind": "recommended", "reason": "Usar hashing com consciência de custo exige conhecer o HashMap por dentro" },
+        { "key": "2.4.3", "kind": "recommended", "reason": "Vários problemas usam HashSet para pertencimento" }
+      ],
+      "checklist": [
+        "Resolvo Two Sum, Valid Anagram e Group Anagrams com hashing",
+        "Explico quando int[26] é preferível a HashMap<Character, Integer>",
+        "Converto uma solução O(n²) de força bruta em O(n) com hashing e justifico"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar como o hashing troca espaço por tempo no padrão do complemento" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Two Sum' em uma passada com HashMap" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Group Anagrams' com chave canônica por contagem de letras" },
+        { "level": 3, "type": "coding", "title": "Resolver 'Ransom Note' e 'First Unique Character in a String' com int[26] e comparar com HashMap" },
+        { "level": 3, "type": "code_analysis", "title": "Analisar o custo real de usar List<Integer> e String como chaves de HashMap (hashCode e equals)" },
+        { "level": 4, "type": "interview", "title": "Resolver 'Longest Consecutive Sequence' e 'Subarray Sum Equals K' em simulação de entrevista, justificando o uso de hashing" }
+      ]
+    },
+    "2.5.4": {
+      "summary": "Técnica de dois ponteiros que percorrem a entrada em direções opostas ou na mesma direção, eliminando laços aninhados. Aplica-se a arrays ordenados, palíndromos, partição in-place e problemas de soma, reduzindo O(n²) para O(n).",
+      "objectives": [
+        "Distinguir as variantes: ponteiros opostos (convergentes) e ponteiros na mesma direção (leitura/escrita)",
+        "Justificar por que mover um ponteiro descarta com segurança candidatos em arrays ordenados",
+        "Resolver problemas de soma (2Sum ordenado, 3Sum) evitando duplicatas",
+        "Aplicar two pointers para partição e remoção in-place",
+        "Reconhecer pelo enunciado quando a técnica se aplica (entrada ordenada, pares, in-place)"
+      ],
+      "estimatedMinutes": 100,
+      "prerequisites": [
+        { "key": "2.5.1", "kind": "recommended", "reason": "A técnica é aplicada sobre arrays manipulados in-place" },
+        { "key": "2.2.3", "kind": "recommended", "reason": "Muitos problemas exigem ordenar antes de aplicar os ponteiros" }
+      ],
+      "checklist": [
+        "Resolvo Two Sum II e Container With Most Water explicando por que mover o ponteiro é seguro",
+        "Resolvo 3Sum em O(n²) sem triplas duplicadas",
+        "Explico quando two pointers não se aplica e hashing é melhor"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar por que, em um array ordenado, mover o ponteiro esquerdo quando a soma é pequena não perde soluções" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Two Sum II - Input Array Is Sorted' com ponteiros opostos" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Squares of a Sorted Array' em O(n)" },
+        { "level": 3, "type": "coding", "title": "Resolver '3Sum' em O(n²) evitando duplicatas" },
+        { "level": 3, "type": "coding", "title": "Resolver 'Container With Most Water' justificando a escolha de qual ponteiro mover" },
+        { "level": 4, "type": "interview", "title": "Resolver 'Trapping Rain Water' com two pointers em O(1) de espaço explicando a invariante" }
+      ]
+    },
+    "2.5.5": {
+      "summary": "Sliding window mantém uma janela contígua sobre a entrada que se expande e contrai, atualizando o estado incrementalmente. Resolve em O(n) problemas de subarrays/substrings com restrição, como 'maior substring sem repetição' ou 'menor janela que contém'.",
+      "objectives": [
+        "Diferenciar janela de tamanho fixo e janela de tamanho variável",
+        "Manter o estado da janela incrementalmente (soma, contagem de frequência, número de distintos)",
+        "Definir a condição de validade e quando contrair a janela",
+        "Justificar o custo O(n) observando que cada ponteiro avança no máximo n vezes",
+        "Reconhecer quando sliding window falha (ex.: valores negativos em somas) e usar prefix sum ou outra técnica"
+      ],
+      "estimatedMinutes": 120,
+      "prerequisites": [
+        { "key": "2.5.4", "kind": "recommended", "reason": "Sliding window é uma especialização de dois ponteiros na mesma direção" },
+        { "key": "2.5.3", "kind": "recommended", "reason": "O estado da janela costuma ser uma contagem de frequências" }
+      ],
+      "checklist": [
+        "Resolvo Longest Substring Without Repeating Characters em O(n) sem consulta",
+        "Resolvo Minimum Window Substring controlando a contagem de caracteres faltantes",
+        "Explico por que a técnica não funciona para soma alvo com números negativos"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar por que sliding window é O(n) mesmo com um while interno" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Maximum Average Subarray I' com janela fixa" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Longest Substring Without Repeating Characters' com sliding window em O(n)" },
+        { "level": 3, "type": "coding", "title": "Resolver 'Longest Repeating Character Replacement' mantendo a frequência máxima da janela" },
+        { "level": 3, "type": "bug_hunt", "title": "Encontrar por que uma sliding window para 'soma igual a k' falha com números negativos" },
+        { "level": 4, "type": "interview", "title": "Resolver 'Minimum Window Substring' em O(n) explicando a condição de validade" }
+      ]
+    },
+    "2.5.6": {
+      "summary": "Prefix sum pré-computa somas acumuladas para responder somas de intervalo em O(1). Combinada com HashMap, resolve contagens de subarrays com soma alvo mesmo com negativos; estende-se a matrizes 2D e a arrays de diferença para atualizações em faixa.",
+      "objectives": [
+        "Construir o array de prefixos com tamanho n + 1 e consultar sum(i, j) = prefix[j + 1] - prefix[i]",
+        "Combinar prefix sum com HashMap para contar subarrays com soma k em O(n)",
+        "Construir prefix sum 2D e consultar somas de retângulos em O(1)",
+        "Aplicar difference array para múltiplas atualizações de intervalo em O(1) cada",
+        "Reconhecer riscos de overflow e usar long quando necessário"
+      ],
+      "estimatedMinutes": 90,
+      "prerequisites": [
+        { "key": "2.5.3", "kind": "recommended", "reason": "O padrão 'subarray com soma k' combina prefix sum com hashing" }
+      ],
+      "checklist": [
+        "Resolvo Range Sum Query - Immutable e Subarray Sum Equals K sem consulta",
+        "Explico por que o HashMap precisa começar com {0: 1}",
+        "Resolvo Range Sum Query 2D com inclusão-exclusão"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar por que prefix sum troca pré-processamento O(n) por consultas O(1)" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Range Sum Query - Immutable' e 'Find Pivot Index'" },
+        { "level": 3, "type": "coding", "title": "Resolver 'Subarray Sum Equals K' com prefix sum e HashMap" },
+        { "level": 3, "type": "coding", "title": "Resolver 'Range Sum Query 2D - Immutable' com inclusão-exclusão" },
+        { "level": 3, "type": "bug_hunt", "title": "Corrigir uma solução de 'Subarray Sum Equals K' que esquece de inicializar o mapa com soma zero" },
+        { "level": 4, "type": "coding", "title": "Resolver 'Corporate Flight Bookings' com difference array" }
+      ]
+    },
+    "2.6.1": {
+      "summary": "Padrões de entrevista com árvores binárias: recursão que retorna informação das subárvores (altura, balanceamento, diâmetro), passagem de estado para baixo (caminhos, limites de BST), LCA e construção a partir de travessias. Complementa a estrutura vista em 2.4.4–2.4.6 com o raciocínio de solução.",
+      "objectives": [
+        "Distinguir recursão top-down (passa estado aos filhos) de bottom-up (combina resultados dos filhos)",
+        "Resolver problemas que retornam múltiplos valores das subárvores (ex.: altura e diâmetro simultâneos)",
+        "Encontrar o Lowest Common Ancestor em árvore binária genérica e em BST",
+        "Reconstruir árvores a partir de travessias pre-order e in-order",
+        "Analisar tempo O(n) e espaço O(h) das soluções e o pior caso em árvores degeneradas"
+      ],
+      "estimatedMinutes": 120,
+      "prerequisites": [
+        { "key": "2.4.4", "kind": "recommended", "reason": "Retoma a estrutura de árvore (2.4.4), agora com foco em padrões de solução" },
+        { "key": "2.4.5", "kind": "recommended", "reason": "Os padrões pressupõem árvores binárias e suas travessias" },
+        { "key": "2.4.6", "kind": "recommended", "reason": "Vários problemas exploram a invariante da BST" }
+      ],
+      "checklist": [
+        "Resolvo Diameter of Binary Tree e Balanced Binary Tree em O(n) com uma única travessia",
+        "Resolvo Lowest Common Ancestor of a Binary Tree explicando o retorno de cada chamada",
+        "Classifico um problema de árvore como top-down ou bottom-up antes de codificar"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar a diferença entre recursão top-down e bottom-up em árvores com um exemplo de cada" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Same Tree', 'Symmetric Tree' e 'Path Sum'" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Diameter of Binary Tree' em O(n)" },
+        { "level": 3, "type": "coding", "title": "Resolver 'Lowest Common Ancestor of a Binary Tree'" },
+        { "level": 3, "type": "coding", "title": "Resolver 'Construct Binary Tree from Preorder and Inorder Traversal' com HashMap de índices" },
+        { "level": 4, "type": "interview", "title": "Resolver 'Binary Tree Maximum Path Sum' explicando o que a função retorna versus o que ela atualiza" }
+      ]
+    },
+    "2.6.2": {
+      "summary": "Depth-First Search explora um caminho até o fim antes de retroceder, de forma recursiva ou com stack explícita. É a base para componentes conexos, detecção de ciclos, flood fill em grids e ordenação topológica.",
+      "objectives": [
+        "Implementar DFS recursiva e iterativa em grafos e grids, controlando visitados",
+        "Explicar a complexidade O(V + E) e o espaço O(V) da pilha ou recursão",
+        "Aplicar DFS para contar componentes conexos e fazer flood fill",
+        "Detectar ciclos em grafos direcionados com três estados (branco, cinza, preto)",
+        "Reconhecer o risco de StackOverflowError em grids grandes e converter para iterativa"
+      ],
+      "estimatedMinutes": 110,
+      "prerequisites": [
+        { "key": "2.4.9", "kind": "recommended", "reason": "DFS opera sobre representações de grafo" },
+        { "key": "2.2.5", "kind": "recommended", "reason": "A versão natural da DFS é recursiva" },
+        { "key": "2.1.7", "kind": "recommended", "reason": "A versão iterativa usa stack explícita" }
+      ],
+      "checklist": [
+        "Resolvo Number of Islands com DFS recursiva e iterativa",
+        "Detecto ciclo em grafo direcionado com o esquema de três cores",
+        "Explico quando marcar como visitado (ao empilhar ou ao desempilhar) e as consequências"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar por que DFS é O(V + E) com lista de adjacência e O(V²) com matriz" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Flood Fill' e 'Number of Islands' com DFS" },
+        { "level": 2, "type": "bug_hunt", "title": "Corrigir uma DFS em grid que entra em recursão infinita por marcar visitados tarde demais" },
+        { "level": 3, "type": "coding", "title": "Resolver 'Course Schedule' detectando ciclo com DFS de três estados" },
+        { "level": 3, "type": "experiment", "title": "Provocar StackOverflowError com DFS recursiva em grid 2000×2000 e reescrever de forma iterativa" },
+        { "level": 4, "type": "coding", "title": "Resolver 'Pacific Atlantic Water Flow' com DFS a partir das bordas" }
+      ]
+    },
+    "2.6.3": {
+      "summary": "Breadth-First Search explora o grafo em camadas usando uma fila, garantindo o caminho mais curto em número de arestas em grafos não ponderados. Inclui BFS por níveis, multi-fonte e em grids.",
+      "objectives": [
+        "Implementar BFS com fila e controle de visitados ao enfileirar",
+        "Explicar por que BFS encontra a menor distância em grafos não ponderados e por que falha com pesos",
+        "Processar BFS por níveis para retornar distâncias ou camadas",
+        "Aplicar BFS multi-fonte e em grids com direções",
+        "Comparar BFS e DFS quanto a memória, caminho mínimo e tipo de problema"
+      ],
+      "estimatedMinutes": 100,
+      "prerequisites": [
+        { "key": "2.4.9", "kind": "recommended", "reason": "BFS opera sobre representações de grafo" },
+        { "key": "2.3.3", "kind": "recommended", "reason": "O padrão de fila por níveis é a base da BFS" }
+      ],
+      "checklist": [
+        "Resolvo Binary Tree Level Order Traversal e Shortest Path in Binary Matrix",
+        "Explico por que marcar visitado ao enfileirar evita trabalho duplicado",
+        "Escolho entre BFS e DFS justificando pelo requisito do problema"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar por que a primeira vez que BFS alcança um nó é pelo caminho mais curto" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Binary Tree Level Order Traversal' e 'Binary Tree Right Side View'" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Shortest Path in Binary Matrix' com BFS em 8 direções" },
+        { "level": 3, "type": "coding", "title": "Resolver '01 Matrix' com BFS multi-fonte" },
+        { "level": 3, "type": "coding", "title": "Resolver 'Word Ladder' modelando palavras como grafo implícito" },
+        { "level": 4, "type": "project", "title": "Construir um resolvedor de labirintos que leia um grid de arquivo e imprima o caminho mínimo reconstruído por array de pais" }
+      ]
+    },
+    "2.6.4": {
+      "summary": "Padrões de entrevista com grafos: modelagem de problemas como grafo, componentes conexos, ordenação topológica (Kahn), union-find, bipartição e uma introdução a Dijkstra. Complementa a representação vista em 2.4.9 com as técnicas de solução.",
+      "objectives": [
+        "Modelar problemas textuais como grafos (nós, arestas, direção, pesos)",
+        "Implementar ordenação topológica com algoritmo de Kahn e com DFS",
+        "Implementar Union-Find com path compression e union by rank e explicar o custo quase O(1)",
+        "Verificar bipartição com BFS/DFS por coloração",
+        "Explicar Dijkstra com PriorityQueue e por que ele exige pesos não negativos"
+      ],
+      "estimatedMinutes": 150,
+      "prerequisites": [
+        { "key": "2.4.9", "kind": "recommended", "reason": "Os padrões partem da representação de grafo" },
+        { "key": "2.6.2", "kind": "recommended", "reason": "Ordenação topológica e componentes usam DFS" },
+        { "key": "2.6.3", "kind": "recommended", "reason": "Kahn e bipartição usam BFS" },
+        { "key": "2.4.8", "kind": "recommended", "reason": "Dijkstra depende de priority queue" }
+      ],
+      "checklist": [
+        "Resolvo Course Schedule II com Kahn e devolvo uma ordem válida",
+        "Implemento Union-Find e resolvo Number of Connected Components / Redundant Connection",
+        "Resolvo Network Delay Time com Dijkstra e explico a lazy deletion na PriorityQueue"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar quando usar ordenação topológica, Union-Find, BFS ou Dijkstra a partir do enunciado" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Course Schedule II' com algoritmo de Kahn" },
+        { "level": 2, "type": "implementation", "title": "Implementar Union-Find com path compression e union by rank" },
+        { "level": 3, "type": "coding", "title": "Resolver 'Redundant Connection' e 'Is Graph Bipartite?'" },
+        { "level": 3, "type": "coding", "title": "Resolver 'Clone Graph' com HashMap de nós originais para cópias" },
+        { "level": 4, "type": "coding", "title": "Resolver 'Network Delay Time' com Dijkstra usando PriorityQueue" }
+      ]
+    },
+    "2.6.5": {
+      "summary": "Backtracking constrói soluções incrementalmente, desfazendo escolhas que não levam a resultado válido. É a técnica para gerar subconjuntos, permutações e combinações e para problemas de restrição como N-Queens, com custo exponencial controlado por poda.",
+      "objectives": [
+        "Aplicar o template escolher → explorar → desfazer com estado mutável compartilhado",
+        "Gerar subconjuntos, permutações e combinações e calcular o número de soluções (2^n, n!, C(n, k))",
+        "Tratar elementos duplicados ordenando e pulando escolhas repetidas no mesmo nível",
+        "Aplicar poda para reduzir o espaço de busca e estimar o ganho",
+        "Analisar a complexidade em termos de número de nós da árvore de decisão × custo por nó"
+      ],
+      "estimatedMinutes": 130,
+      "prerequisites": [
+        { "key": "2.2.5", "kind": "required", "reason": "Backtracking é recursão com desfazer de estado" },
+        { "key": "2.6.2", "kind": "recommended", "reason": "Backtracking é uma DFS sobre a árvore de decisões" }
+      ],
+      "checklist": [
+        "Resolvo Subsets, Permutations e Combination Sum com o mesmo template",
+        "Resolvo Subsets II sem gerar duplicatas",
+        "Explico o bug de adicionar a lista mutável ao resultado sem copiar",
+        "Resolvo N-Queens com poda por colunas e diagonais"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Desenhar a árvore de decisão de Subsets para [1, 2, 3] e relacionar com 2^n" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Subsets' e 'Permutations' com o template escolher-explorar-desfazer" },
+        { "level": 2, "type": "bug_hunt", "title": "Corrigir um backtracking que retorna listas vazias por adicionar a referência mutável ao resultado" },
+        { "level": 3, "type": "coding", "title": "Resolver 'Combination Sum' e 'Subsets II' tratando reutilização e duplicatas" },
+        { "level": 3, "type": "coding", "title": "Resolver 'Word Search' em grid com marcação temporária de visitados" },
+        { "level": 4, "type": "implementation", "title": "Implementar um resolvedor de Sudoku com backtracking e poda por linhas, colunas e blocos" }
+      ]
+    },
+    "2.6.6": {
+      "summary": "Algoritmos gulosos fazem a melhor escolha local a cada passo sem reconsiderar. São simples e eficientes, mas só corretos quando o problema tem a propriedade de escolha gulosa; o tópico treina reconhecer esses casos e justificar a corretude com argumentos de troca.",
+      "objectives": [
+        "Definir propriedade de escolha gulosa e subestrutura ótima",
+        "Justificar a corretude com argumento de troca (exchange argument) ou 'stays ahead'",
+        "Construir contraexemplos para estratégias gulosas incorretas (ex.: troco com moedas arbitrárias)",
+        "Aplicar greedy com ordenação a problemas de agendamento e intervalos",
+        "Distinguir quando greedy basta e quando é necessário programação dinâmica"
+      ],
+      "estimatedMinutes": 100,
+      "prerequisites": [
+        { "key": "2.2.3", "kind": "recommended", "reason": "Muitas estratégias gulosas começam ordenando por um critério" },
+        { "key": "2.3.6", "kind": "recommended", "reason": "Problemas de intervalos são exemplos clássicos de greedy" }
+      ],
+      "checklist": [
+        "Resolvo Jump Game e Gas Station justificando a escolha gulosa",
+        "Apresento um contraexemplo em que o troco guloso falha",
+        "Explico com argumento de troca por que ordenar por término é ótimo em seleção de atividades"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Construir um contraexemplo em que o troco guloso não minimiza o número de moedas" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Best Time to Buy and Sell Stock' e 'Assign Cookies'" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Jump Game' mantendo o alcance máximo" },
+        { "level": 3, "type": "coding", "title": "Resolver 'Gas Station' e provar por que basta uma passada" },
+        { "level": 3, "type": "interview", "title": "Provar com argumento de troca que selecionar atividades por menor término é ótimo" },
+        { "level": 4, "type": "coding", "title": "Resolver 'Partition Labels' e 'Jump Game II' explicando a invariante" }
+      ]
+    },
+    "2.6.7": {
+      "summary": "Programação dinâmica resolve problemas com subproblemas sobrepostos e subestrutura ótima armazenando resultados já calculados. O tópico cobre DP básica 1D e 2D: definição de estado, transição, casos base, memoização (top-down), tabulação (bottom-up) e otimização de espaço.",
+      "objectives": [
+        "Identificar subproblemas sobrepostos e subestrutura ótima em um problema",
+        "Definir estado, transição e casos base explicitamente antes de codificar",
+        "Implementar a mesma solução com memoização e com tabulação e comparar custos",
+        "Reduzir o espaço de DP 1D e 2D quando a transição depende apenas de linhas/posições anteriores",
+        "Resolver problemas clássicos: escadas, house robber, coin change, LIS, LCS e unique paths"
+      ],
+      "estimatedMinutes": 180,
+      "prerequisites": [
+        { "key": "2.2.5", "kind": "required", "reason": "A formulação top-down da DP é uma recursão com cache" },
+        { "key": "2.2.6", "kind": "recommended", "reason": "Contrastar com divisão e conquista esclarece o papel dos subproblemas sobrepostos" },
+        { "key": "2.6.6", "kind": "recommended", "reason": "Entender quando greedy falha motiva a DP" }
+      ],
+      "checklist": [
+        "Resolvo Climbing Stairs, House Robber e Coin Change escrevendo estado e transição antes do código",
+        "Converto uma solução memoizada em tabulada e reduzo o espaço para O(1) ou O(n)",
+        "Resolvo Longest Common Subsequence com tabela 2D e explico cada célula",
+        "Explico por que Fibonacci memoizado é O(n) e o ingênuo é O(2^n)"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar subproblemas sobrepostos usando a árvore de chamadas de Fibonacci" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Climbing Stairs' e 'House Robber' com tabulação e espaço O(1)" },
+        { "level": 2, "type": "coding", "title": "Resolver 'Unique Paths' com DP 2D e depois com uma única linha" },
+        { "level": 3, "type": "coding", "title": "Resolver 'Coin Change' e explicar por que greedy falha nesse problema" },
+        { "level": 3, "type": "coding", "title": "Resolver 'Longest Increasing Subsequence' em O(n²) e conhecer a versão O(n log n)" },
+        { "level": 4, "type": "coding", "title": "Resolver 'Longest Common Subsequence' e reconstruir a subsequência a partir da tabela" }
+      ]
+    }
+  }
+}

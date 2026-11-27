@@ -1,0 +1,3065 @@
+{
+  "stage": "03",
+  "modules": {
+    "3.1": {
+      "description": "Como um byte sai de um processo Java e chega a outro processo em outra máquina: endereçamento IP, portas, resolução de nomes, transporte confiável (TCP) e não confiável (UDP), a abstração de sockets do sistema operacional e as camadas de segurança (TLS) e aplicação (HTTP). O foco é entender custos reais — round-trips, handshakes, head-of-line blocking, reutilização de conexões — que explicam a latência de qualquer API em produção.",
+      "objectives": [
+        "Explicar o caminho completo de uma requisição HTTPS, do DNS até a resposta, contando os round-trips envolvidos",
+        "Diferenciar TCP e UDP em garantias, custos e casos de uso reais",
+        "Usar ferramentas de diagnóstico (dig, curl -v, ss/netstat, tcpdump/Wireshark, openssl s_client) para observar protocolos em funcionamento",
+        "Relacionar sockets do sistema operacional com as APIs de rede do Java",
+        "Entender como HTTP/1.1, HTTP/2 e HTTP/3 lidam com conexões persistentes e multiplexação",
+        "Aplicar as restrições do estilo REST sobre a semântica do HTTP"
+      ]
+    },
+    "3.2": {
+      "description": "Transações e controle de concorrência em bancos relacionais: garantias ACID, níveis de isolamento e as anomalias que cada um permite, locks, deadlocks, estratégias otimista e pessimista, MVCC e replicação. Embora apareça antes no roadmap, recomenda-se estudar o módulo 3.4 (SQL, índices e performance) antes deste — os pré-requisitos dos tópicos apontam para ele. Os experimentos usam duas sessões psql simultâneas no PostgreSQL para reproduzir cada fenômeno na prática.",
+      "objectives": [
+        "Explicar o que cada letra de ACID garante e como o banco implementa essas garantias (WAL, locks, MVCC)",
+        "Reproduzir dirty read, non-repeatable read, phantom read e lost update com sessões concorrentes",
+        "Escolher o nível de isolamento adequado conhecendo seu custo e as anomalias permitidas",
+        "Diagnosticar e prevenir deadlocks e contenção de locks",
+        "Implementar optimistic e pessimistic locking em SQL e entender seu equivalente no ecossistema Java",
+        "Entender MVCC no PostgreSQL (xmin/xmax, snapshots, VACUUM) e os trade-offs de replicação síncrona e assíncrona"
+      ]
+    },
+    "3.3": {
+      "description": "O que é necessário para operar um serviço backend depois que ele sai da máquina do desenvolvedor: os três pilares da observabilidade (logs, métricas e tracing), health checks, definição de SLIs e SLOs, pipelines de CI/CD e estratégias de deploy e rollback. O objetivo é saber detectar, diagnosticar e reverter problemas em produção com o menor impacto possível para os usuários.",
+      "objectives": [
+        "Produzir logs estruturados e correlacionáveis, sem vazar dados sensíveis",
+        "Instrumentar métricas (contadores, gauges, histogramas) e calcular percentis de latência corretamente",
+        "Propagar contexto de tracing distribuído entre serviços",
+        "Definir SLIs, SLOs e error budgets a partir da experiência do usuário",
+        "Montar um pipeline de CI/CD com testes e artefatos imutáveis",
+        "Comparar rolling, blue/green e canary e planejar rollbacks seguros, inclusive com migrações de banco"
+      ]
+    },
+    "3.4": {
+      "description": "A base do trabalho com bancos relacionais: o modelo relacional, a linguagem SQL, joins e chaves, e como o banco executa consultas por dentro — estruturas de índice (B+ Tree), planos de execução, o otimizador baseado em custo e a leitura do EXPLAIN. Termina com connection pools, ponto onde o banco encontra a aplicação. Este módulo é pré-requisito pedagógico recomendado do módulo 3.2.",
+      "objectives": [
+        "Modelar dados de forma normalizada e expressar regras de integridade com chaves e constraints",
+        "Escrever consultas SQL corretas, incluindo joins, agregações, subconsultas e window functions",
+        "Explicar como um índice B+ Tree é organizado em páginas e por que acelera buscas e ordenações",
+        "Ler planos de execução com EXPLAIN (ANALYZE, BUFFERS) e identificar gargalos",
+        "Entender como o query planner estima custos usando estatísticas",
+        "Dimensionar e configurar um connection pool (ex.: HikariCP) com base em métricas reais"
+      ]
+    },
+    "3.5": {
+      "description": "Como projetar APIs HTTP seguras e robustas: design REST orientado a recursos, statelessness, autenticação e autorização, sessões, cookies e JWT, armazenamento seguro de senhas, CORS, idempotência e prevenção de SQL injection. Aqui REST é revisitado do ponto de vista do design de contratos e da segurança, complementando a visão de protocolo do módulo 3.1. Os exemplos se conectam ao ecossistema Java/Spring sem antecipar o aprofundamento da Etapa 04.",
+      "objectives": [
+        "Projetar contratos REST consistentes (recursos, status codes, paginação, versionamento, erros)",
+        "Diferenciar autenticação e autorização e aplicar modelos como RBAC e verificações por recurso",
+        "Comparar sessões com estado no servidor e tokens JWT, incluindo revogação e armazenamento no cliente",
+        "Armazenar senhas com algoritmos adequados (bcrypt, scrypt, Argon2) e entender o papel do salt",
+        "Configurar CORS e cookies (HttpOnly, Secure, SameSite) entendendo as ameaças que mitigam",
+        "Garantir idempotência em operações críticas e eliminar SQL injection com consultas parametrizadas"
+      ]
+    }
+  },
+  "topics": {
+    "3.1.1": {
+      "summary": "IP é o protocolo da camada de rede responsável por endereçar e rotear pacotes entre hosts, sem garantia de entrega ou ordem. Envolve IPv4/IPv6, sub-redes (CIDR), roteamento, TTL, fragmentação/MTU e NAT.",
+      "objectives": [
+        "Explicar o modelo de camadas (TCP/IP) e o papel do IP como serviço best-effort",
+        "Calcular rede, broadcast e quantidade de hosts a partir de uma notação CIDR",
+        "Diferenciar IPv4 e IPv6, endereços públicos, privados e de loopback",
+        "Explicar como roteadores encaminham pacotes por tabela de rotas e o papel do TTL",
+        "Entender NAT e por que ele afeta conexões de entrada em servidores"
+      ],
+      "estimatedMinutes": 90,
+      "prerequisites": [
+        {
+          "key": "1.2.1",
+          "kind": "recommended",
+          "reason": "A pilha de rede é implementada pelo kernel do sistema operacional"
+        },
+        {
+          "key": "1.2.9",
+          "kind": "recommended",
+          "reason": "Rede é uma forma de I/O mediada pelo sistema operacional"
+        }
+      ],
+      "checklist": [
+        "Consigo calcular manualmente a faixa de hosts de 10.0.12.0/22",
+        "Explico o que acontece com um pacote cujo TTL chega a zero e como o traceroute usa isso",
+        "Consigo explicar por que um serviço atrás de NAT não recebe conexões sem port forwarding",
+        "Leio a tabela de rotas da minha máquina (ip route / route print) e identifico o default gateway"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar por que o IP é best-effort e quem garante confiabilidade acima dele"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Implementar em Java uma calculadora CIDR (rede, broadcast, máscara, hosts)"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Usar traceroute/tracert e interpretar cada salto e as variações de latência"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "O que acontece quando um pacote excede a MTU do caminho e o bit DF está ligado?"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Construir um verificador de IP (público/privado/loopback/IPv6) usando InetAddress"
+        }
+      ]
+    },
+    "3.1.2": {
+      "summary": "Portas são números de 16 bits que identificam processos/serviços em um host; junto com IPs e protocolo formam a 5-tupla que identifica uma conexão. Envolve portas conhecidas, efêmeras, bind e escuta.",
+      "objectives": [
+        "Explicar por que IP sozinho não basta e como a 5-tupla identifica uma conexão",
+        "Diferenciar portas conhecidas, registradas e efêmeras",
+        "Listar portas em escuta e conexões ativas com ss/netstat e associá-las a processos",
+        "Explicar por que vários clientes podem conectar na mesma porta 443 de um servidor",
+        "Entender o esgotamento de portas efêmeras em clientes com muitas conexões curtas"
+      ],
+      "estimatedMinutes": 45,
+      "prerequisites": [
+        {
+          "key": "1.2.2",
+          "kind": "recommended",
+          "reason": "Portas associam tráfego de rede a processos"
+        }
+      ],
+      "checklist": [
+        "Identifico qual processo está ouvindo em uma porta na minha máquina",
+        "Explico o erro 'Address already in use' e como resolvê-lo",
+        "Explico por que um servidor não esgota portas ao aceitar milhares de clientes, mas um cliente pode"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar a 5-tupla e por que ela permite milhares de conexões na mesma porta do servidor"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Mapear portas em escuta com ss -tlnp/netstat -ano e identificar os processos donos"
+        },
+        {
+          "level": 2,
+          "type": "bug_hunt",
+          "title": "Diagnosticar um Spring Boot que falha ao iniciar com BindException na porta 8080"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Por que um cliente HTTP sem reuso de conexão pode esgotar portas efêmeras?"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Escrever um port scanner TCP simples em Java com timeout configurável"
+        }
+      ]
+    },
+    "3.1.3": {
+      "summary": "DNS é o sistema distribuído e hierárquico que traduz nomes em registros (A, AAAA, CNAME, MX, TXT). Envolve resolução recursiva e iterativa, cache com TTL e impactos de latência e falha em serviços backend.",
+      "objectives": [
+        "Descrever a resolução de um nome passando por resolver recursivo, root, TLD e autoritativo",
+        "Diferenciar tipos de registro A, AAAA, CNAME, MX, TXT e NS",
+        "Explicar o papel do TTL e os efeitos de cache em migrações e failover",
+        "Usar dig/nslookup para inspecionar a cadeia de resolução",
+        "Entender o cache de DNS da JVM (networkaddress.cache.ttl) e seus efeitos em produção"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "3.1.1",
+          "kind": "recommended",
+          "reason": "DNS resolve nomes para endereços IP"
+        }
+      ],
+      "checklist": [
+        "Consigo seguir manualmente uma resolução com dig +trace e explicar cada etapa",
+        "Explico por que uma mudança de DNS pode demorar a propagar",
+        "Explico o risco de uma JVM com cache de DNS infinito diante de IPs que mudam (ex.: load balancers em nuvem)"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Desenhar a resolução recursiva de api.exemplo.com.br do root até o autoritativo"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Rodar dig +trace e comparar TTLs entre resolvers diferentes"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Investigar um serviço Java que continua chamando um IP antigo após troca de DNS"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Por que DNS usa UDP na maioria das consultas e quando recorre a TCP?"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Construir um resolvedor DNS mínimo em Java que monta e envia uma query UDP do tipo A"
+        }
+      ]
+    },
+    "3.1.4": {
+      "summary": "TCP fornece um fluxo de bytes confiável, ordenado e orientado a conexão sobre IP, usando three-way handshake, números de sequência, ACKs, retransmissão, controle de fluxo e controle de congestionamento. Também introduz head-of-line blocking e estados como TIME_WAIT.",
+      "objectives": [
+        "Explicar o three-way handshake e o encerramento com FIN/ACK, incluindo TIME_WAIT",
+        "Explicar números de sequência, ACKs e retransmissão por timeout e fast retransmit",
+        "Diferenciar controle de fluxo (janela do receptor) e controle de congestionamento (slow start, cwnd)",
+        "Explicar head-of-line blocking no nível do TCP",
+        "Entender o efeito do algoritmo de Nagle e do TCP_NODELAY em latência",
+        "Estimar o custo em RTTs para abrir uma conexão e transferir dados"
+      ],
+      "estimatedMinutes": 150,
+      "prerequisites": [
+        {
+          "key": "3.1.1",
+          "kind": "required",
+          "reason": "TCP é transportado sobre IP"
+        },
+        {
+          "key": "3.1.2",
+          "kind": "recommended",
+          "reason": "Conexões TCP são identificadas por pares de portas"
+        }
+      ],
+      "checklist": [
+        "Capturei e identifiquei SYN, SYN-ACK, ACK e o encerramento de uma conexão real",
+        "Explico por que uma conexão nova é mais lenta no início (slow start)",
+        "Explico por que uma perda de pacote atrasa todos os dados seguintes no mesmo fluxo",
+        "Sei interpretar um grande número de conexões em TIME_WAIT ou CLOSE_WAIT"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar por que o handshake precisa de três mensagens e não duas"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Capturar um handshake TCP com tcpdump/Wireshark e anotar flags, seq e ack"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Simular perda de pacotes com tc netem (ou clumsy no Windows) e observar retransmissões e cwnd"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Diagnosticar milhares de conexões em CLOSE_WAIT em um serviço que não fecha sockets"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Como TCP_NODELAY e o Nagle interagem com delayed ACK para causar latências de 40ms?"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar um protocolo de transferência confiável simplificado (stop-and-wait) sobre UDP"
+        }
+      ]
+    },
+    "3.1.5": {
+      "summary": "UDP é um protocolo de transporte sem conexão que entrega datagramas sem garantia de entrega, ordem ou controle de congestionamento, com overhead mínimo. É a base de DNS, streaming, jogos e do QUIC/HTTP/3.",
+      "objectives": [
+        "Comparar UDP e TCP em garantias, overhead de cabeçalho e latência",
+        "Explicar por que aplicações em tempo real preferem perder dados a esperar retransmissões",
+        "Entender os limites de tamanho de datagrama e a relação com MTU",
+        "Explicar como o QUIC reimplementa confiabilidade e criptografia sobre UDP"
+      ],
+      "estimatedMinutes": 50,
+      "prerequisites": [
+        {
+          "key": "3.1.4",
+          "kind": "recommended",
+          "reason": "UDP é melhor compreendido em contraste com as garantias do TCP"
+        }
+      ],
+      "checklist": [
+        "Explico em quais cenários UDP é preferível a TCP, com exemplos reais",
+        "Demonstrei perda ou reordenação de datagramas em um experimento",
+        "Explico por que o HTTP/3 roda sobre QUIC/UDP"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Comparar os cabeçalhos UDP e TCP campo a campo e justificar o overhead"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Criar cliente e servidor UDP com DatagramSocket que numeram mensagens e detectam perdas"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Enviar rajadas de datagramas sob perda simulada e medir taxa de entrega e reordenação"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Por que o QUIC escolheu UDP em vez de criar um novo protocolo de transporte?"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Construir um serviço de heartbeat/métricas via UDP em Java tolerante a perdas"
+        }
+      ]
+    },
+    "3.1.6": {
+      "summary": "Sockets são a abstração do sistema operacional para comunicação em rede, expostos como file descriptors com chamadas socket, bind, listen, accept, connect, read e write. Incluem backlog, buffers do kernel, I/O bloqueante vs. não bloqueante e multiplexação (select/epoll).",
+      "objectives": [
+        "Descrever o ciclo de vida de um socket servidor e cliente nas syscalls do SO",
+        "Explicar backlog de accept e buffers de envio/recepção do kernel",
+        "Diferenciar I/O bloqueante, não bloqueante e multiplexado (epoll/kqueue)",
+        "Relacionar ServerSocket/Socket e NIO (Selector, SocketChannel) com as syscalls subjacentes",
+        "Entender o modelo thread-per-connection e seus limites de escala"
+      ],
+      "estimatedMinutes": 120,
+      "prerequisites": [
+        {
+          "key": "3.1.4",
+          "kind": "required",
+          "reason": "Sockets de stream expõem conexões TCP"
+        },
+        {
+          "key": "1.2.3",
+          "kind": "recommended",
+          "reason": "Modelos de servidor dependem de threads"
+        },
+        {
+          "key": "1.2.9",
+          "kind": "recommended",
+          "reason": "Sockets são file descriptors e seguem o modelo de I/O do SO"
+        }
+      ],
+      "checklist": [
+        "Implementei um servidor TCP em Java que atende vários clientes simultaneamente",
+        "Explico o que acontece quando o backlog enche",
+        "Explico por que epoll escala melhor que uma thread por conexão bloqueada",
+        "Sei que read() pode retornar menos bytes do que o solicitado e trato isso corretamente"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Mapear cada método de ServerSocket/Socket para a syscall correspondente"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Implementar um echo server TCP thread-per-connection em Java"
+        },
+        {
+          "level": 2,
+          "type": "bug_hunt",
+          "title": "Corrigir um protocolo que assume que um read() devolve a mensagem inteira"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Observar as syscalls de um servidor Java com strace (ou Process Monitor) durante accept e read"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Reescrever o echo server com Java NIO Selector em uma única thread"
+        }
+      ]
+    },
+    "3.1.7": {
+      "summary": "TLS protege comunicação com confidencialidade, integridade e autenticação do servidor, combinando troca de chaves (ECDHE), certificados X.509 e criptografia simétrica autenticada. Inclui o handshake do TLS 1.3, cadeia de confiança, SNI e mTLS.",
+      "objectives": [
+        "Explicar por que TLS usa criptografia assimétrica para troca de chaves e simétrica para dados",
+        "Descrever o handshake TLS 1.3 e comparar seu custo em RTTs com o TLS 1.2",
+        "Validar uma cadeia de certificados até uma CA raiz e explicar o papel do hostname",
+        "Explicar forward secrecy e por que ECDHE a oferece",
+        "Entender mTLS, keystores e truststores no Java"
+      ],
+      "estimatedMinutes": 120,
+      "prerequisites": [
+        {
+          "key": "3.1.4",
+          "kind": "required",
+          "reason": "TLS opera sobre uma conexão TCP estabelecida"
+        }
+      ],
+      "checklist": [
+        "Inspecionei uma cadeia de certificados com openssl s_client e expliquei cada nível",
+        "Explico o que um atacante na rede consegue e não consegue ver numa conexão TLS",
+        "Resolvo um erro PKIX path building failed em uma aplicação Java",
+        "Explico a diferença entre autenticação do servidor e mTLS"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar como certificado, assinatura da CA e hostname garantem que falo com o servidor certo"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Inspecionar handshake, versão, cipher suite e cadeia com openssl s_client -connect"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Capturar um handshake TLS 1.3 no Wireshark e identificar ClientHello, SNI e ServerHello"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Diagnosticar PKIX path building failed ao chamar uma API com certificado de CA interna"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Configurar mTLS entre dois serviços Java com keystore e truststore próprios"
+        }
+      ]
+    },
+    "3.1.8": {
+      "summary": "HTTP é o protocolo de aplicação requisição-resposta baseado em métodos, status codes, cabeçalhos e corpo. Abrange semântica dos métodos, cache, negociação de conteúdo e a evolução HTTP/1.1, HTTP/2 (multiplexação binária) e HTTP/3 (QUIC).",
+      "objectives": [
+        "Escrever uma requisição HTTP/1.1 manualmente e interpretar a resposta byte a byte",
+        "Explicar a semântica dos métodos (safe, idempotente) e das classes de status code",
+        "Usar cabeçalhos de cache (Cache-Control, ETag, If-None-Match) e de conteúdo",
+        "Explicar como o HTTP/2 multiplexa streams e por que o head-of-line blocking do TCP persiste",
+        "Explicar o que o HTTP/3 resolve ao usar QUIC"
+      ],
+      "estimatedMinutes": 120,
+      "prerequisites": [
+        {
+          "key": "3.1.4",
+          "kind": "required",
+          "reason": "HTTP/1.1 e HTTP/2 rodam sobre TCP"
+        },
+        {
+          "key": "3.1.3",
+          "kind": "recommended",
+          "reason": "Toda requisição a um host começa pela resolução do nome"
+        }
+      ],
+      "checklist": [
+        "Fiz uma requisição HTTP manual via telnet/nc e interpretei a resposta",
+        "Escolho corretamente entre 400, 401, 403, 404, 409, 422 e 500 para cenários dados",
+        "Explico como ETag permite respostas 304 Not Modified",
+        "Explico a diferença entre head-of-line blocking no HTTP/1.1 e no HTTP/2"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Classificar métodos HTTP como safe e/ou idempotentes e justificar"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Enviar uma requisição GET manual com nc/telnet e analisar status line, headers e corpo"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Comparar curl --http1.1 e --http2 com -v e observar a negociação via ALPN"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Por que o HTTP/2 ainda sofre head-of-line blocking e como o HTTP/3 resolve?"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar um servidor HTTP/1.1 mínimo sobre sockets em Java (parsing de request line e headers)"
+        }
+      ]
+    },
+    "3.1.9": {
+      "summary": "HTTPS é HTTP transportado sobre TLS, combinando a semântica do HTTP com confidencialidade e autenticação. Abrange custo de conexão, terminação TLS em proxies/load balancers, HSTS e redirecionamentos seguros.",
+      "objectives": [
+        "Contar os RTTs de uma primeira requisição HTTPS (DNS, TCP, TLS, HTTP)",
+        "Explicar terminação TLS em load balancer e as implicações para o backend (X-Forwarded-Proto)",
+        "Explicar HSTS e o ataque de SSL stripping que ele previne",
+        "Entender session resumption e 0-RTT e seus riscos de replay"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "3.1.7",
+          "kind": "required",
+          "reason": "HTTPS é HTTP sobre TLS"
+        },
+        {
+          "key": "3.1.8",
+          "kind": "required",
+          "reason": "A camada de aplicação do HTTPS é o HTTP"
+        }
+      ],
+      "checklist": [
+        "Medi o tempo de cada fase de uma requisição HTTPS com curl -w",
+        "Explico por que uma aplicação atrás de um proxy pode gerar redirects http:// incorretos",
+        "Explico o que o HSTS protege e o que ele não protege"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Listar o que fica visível a um observador de rede em uma requisição HTTPS (IP, SNI, tamanhos)"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Medir time_namelookup, time_connect, time_appconnect e time_starttransfer com curl -w"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Corrigir uma aplicação atrás de load balancer que gera redirects para http:// em vez de https://"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Quais os riscos do 0-RTT do TLS 1.3 para requisições não idempotentes?"
+        },
+        {
+          "level": 4,
+          "type": "project",
+          "title": "Configurar um proxy reverso (nginx/Caddy) com TLS, HSTS e encaminhamento correto de headers para um app Java"
+        }
+      ]
+    },
+    "3.1.10": {
+      "summary": "REST é um estilo arquitetural definido por restrições (cliente-servidor, stateless, cache, interface uniforme, sistema em camadas) que se apoia na semântica do HTTP. Aqui o foco é o estilo e o uso correto do protocolo, não o design detalhado de APIs.",
+      "objectives": [
+        "Enumerar as restrições do REST definidas por Fielding e o propósito de cada uma",
+        "Explicar como recursos, representações e métodos HTTP compõem a interface uniforme",
+        "Diferenciar REST de RPC sobre HTTP com exemplos concretos",
+        "Explicar o papel do cache e de intermediários (proxies, CDNs) no estilo REST",
+        "Entender HATEOAS e o modelo de maturidade de Richardson"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "3.1.8",
+          "kind": "required",
+          "reason": "REST é aplicado sobre a semântica dos métodos e status do HTTP"
+        }
+      ],
+      "checklist": [
+        "Classifico uma API existente no modelo de maturidade de Richardson",
+        "Reescrevo endpoints no estilo RPC (/criarPedido) como recursos REST",
+        "Explico por que a restrição stateless favorece escala horizontal"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar cada restrição do REST e o que se perde ao violá-la"
+        },
+        {
+          "level": 2,
+          "type": "code_analysis",
+          "title": "Classificar uma API pública real nos níveis 0 a 3 de Richardson"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Converter uma lista de endpoints RPC em recursos e métodos HTTP apropriados"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Uma API que usa POST para tudo e sempre responde 200 é REST? Por quê?"
+        },
+        {
+          "level": 4,
+          "type": "project",
+          "title": "Projetar uma API de biblioteca no nível 3 de Richardson com links HATEOAS"
+        }
+      ]
+    },
+    "3.1.11": {
+      "summary": "Keep-Alive (conexões persistentes) permite reutilizar uma conexão TCP/TLS para várias requisições HTTP, amortizando handshakes. Envolve timeouts de ociosidade, pools de conexão em clientes HTTP e interação com load balancers.",
+      "objectives": [
+        "Quantificar a economia de RTTs ao reutilizar conexões",
+        "Explicar timeouts de keep-alive no cliente, servidor e load balancer e por que devem ser coerentes",
+        "Configurar pools de conexão em clientes HTTP Java (HttpClient, Apache HttpClient)",
+        "Diagnosticar erros de conexão resetada causados por timeouts incompatíveis",
+        "Comparar keep-alive do HTTP/1.1 com multiplexação do HTTP/2"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "3.1.8",
+          "kind": "required",
+          "reason": "Keep-Alive é um comportamento do protocolo HTTP"
+        },
+        {
+          "key": "3.1.4",
+          "kind": "recommended",
+          "reason": "O ganho vem de evitar handshake e slow start do TCP"
+        }
+      ],
+      "checklist": [
+        "Medi a diferença de latência entre requisições com e sem reuso de conexão",
+        "Explico por que o timeout de ociosidade do cliente deve ser menor que o do servidor/LB",
+        "Configurei um pool de conexões HTTP com limites e timeouts explícitos"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Calcular os RTTs economizados ao fazer 10 requisições HTTPS em uma única conexão"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Comparar com curl -v várias URLs na mesma conexão versus conexões separadas"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Investigar 'Connection reset by peer' intermitente causado por idle timeout do load balancer menor que o do cliente"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Por que um serviço que cria um novo HttpClient por requisição degrada sob carga?"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Benchmark em Java de um cliente HTTP com e sem pool, medindo latência p50/p99 e conexões abertas"
+        }
+      ]
+    },
+    "3.2.1": {
+      "summary": "Uma transação agrupa operações em uma unidade lógica que é confirmada (COMMIT) ou desfeita (ROLLBACK) por inteiro. Envolve delimitação explícita, autocommit, savepoints e o custo de transações longas.",
+      "objectives": [
+        "Usar BEGIN, COMMIT, ROLLBACK e SAVEPOINT corretamente",
+        "Explicar o modo autocommit e seus efeitos em JDBC",
+        "Identificar o escopo correto de uma transação em um caso de negócio",
+        "Explicar por que transações longas são prejudiciais (locks, bloat, conexões presas)",
+        "Controlar transações manualmente via JDBC (setAutoCommit, commit, rollback)"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "3.4.2",
+          "kind": "required",
+          "reason": "Transações agrupam comandos SQL; é preciso dominar SQL antes"
+        },
+        {
+          "key": "3.4.1",
+          "kind": "recommended",
+          "reason": "O modelo relacional dá contexto às regras de integridade protegidas por transações"
+        }
+      ],
+      "checklist": [
+        "Implementei uma transferência entre contas em JDBC que faz rollback em caso de falha",
+        "Explico o que acontece com uma transação aberta quando a conexão cai",
+        "Uso savepoints para desfazer parte de uma transação"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar o que acontece com cada comando quando um erro ocorre no meio de uma transação no PostgreSQL"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Implementar transferência bancária em JDBC com controle manual de commit e rollback"
+        },
+        {
+          "level": 2,
+          "type": "bug_hunt",
+          "title": "Encontrar o bug de uma transferência que debita mas não credita por causa do autocommit"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Deixar uma transação aberta 'idle in transaction' e observar seus efeitos em pg_stat_activity"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Criar um pequeno helper Java 'inTransaction(lambda)' que garante commit/rollback e fechamento da conexão"
+        }
+      ]
+    },
+    "3.2.2": {
+      "summary": "ACID descreve as garantias de transações: atomicidade, consistência, isolamento e durabilidade. O foco é como bancos as implementam — write-ahead log (WAL), fsync, constraints, locks e MVCC.",
+      "objectives": [
+        "Definir cada propriedade ACID com precisão e exemplos de violação",
+        "Explicar como o WAL garante atomicidade e durabilidade após crashes",
+        "Diferenciar a consistência do ACID da consistência de sistemas distribuídos (CAP)",
+        "Entender o custo de durabilidade (fsync, synchronous_commit) e seus trade-offs"
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        {
+          "key": "3.4.5",
+          "kind": "recommended",
+          "reason": "Constraints como FK são o mecanismo concreto da consistência"
+        }
+      ],
+      "checklist": [
+        "Explico como o banco se recupera de um crash no meio de uma transação usando o WAL",
+        "Diferencio o 'C' do ACID do 'C' do CAP",
+        "Explico o que se perde ao desligar synchronous_commit"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Dar um exemplo concreto de violação de cada letra de ACID"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Medir o throughput de inserts com synchronous_commit on versus off"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Como o write-ahead log permite durabilidade sem gravar as páginas de dados a cada commit?"
+        },
+        {
+          "level": 3,
+          "type": "code_analysis",
+          "title": "Inspecionar registros do WAL com pg_waldump após uma transação simples"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar um key-value store em Java com log append-only e recuperação após crash"
+        }
+      ]
+    },
+    "3.2.3": {
+      "summary": "Níveis de isolamento (Read Uncommitted, Read Committed, Repeatable Read, Serializable) definem quais anomalias de concorrência uma transação pode observar. Abrange o padrão SQL, as diferenças de implementação no PostgreSQL/MySQL e o custo de cada nível.",
+      "objectives": [
+        "Relacionar cada nível de isolamento às anomalias que ele previne segundo o padrão SQL",
+        "Explicar como PostgreSQL implementa os níveis com snapshots e o SSI no Serializable",
+        "Comparar defaults e comportamentos de PostgreSQL e MySQL/InnoDB",
+        "Tratar falhas de serialização (SQLSTATE 40001) com retry",
+        "Configurar o nível de isolamento via SQL e JDBC"
+      ],
+      "estimatedMinutes": 90,
+      "prerequisites": [
+        {
+          "key": "3.2.2",
+          "kind": "recommended",
+          "reason": "Isolamento é a letra I do ACID"
+        }
+      ],
+      "checklist": [
+        "Monto a tabela nível x anomalia de memória e explico as diferenças do PostgreSQL",
+        "Provoquei e tratei um erro de serialização em Serializable",
+        "Justifico a escolha de um nível de isolamento para um caso de negócio"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Construir a matriz nível de isolamento x anomalia e justificar cada célula"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Abrir duas sessões psql e comparar leituras em READ COMMITTED versus REPEATABLE READ"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Reproduzir write skew em REPEATABLE READ e mostrar que SERIALIZABLE o impede"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Por que o Repeatable Read do PostgreSQL não permite phantoms enquanto o padrão SQL permite?"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar em Java um executor de transação Serializable com retry em SQLSTATE 40001"
+        }
+      ]
+    },
+    "3.2.4": {
+      "summary": "Dirty read ocorre quando uma transação lê dados escritos por outra ainda não confirmada, que pode fazer rollback. Ocorre apenas em Read Uncommitted e o PostgreSQL nunca o permite.",
+      "objectives": [
+        "Definir dirty read e mostrar por que ele leva a decisões baseadas em dados que nunca existiram",
+        "Identificar em quais níveis e bancos o fenômeno é possível",
+        "Reproduzir o fenômeno em um banco que o permite (MySQL em READ UNCOMMITTED)",
+        "Explicar por que o PostgreSQL trata Read Uncommitted como Read Committed"
+      ],
+      "estimatedMinutes": 40,
+      "prerequisites": [
+        {
+          "key": "3.2.3",
+          "kind": "required",
+          "reason": "O fenômeno é definido em relação aos níveis de isolamento"
+        }
+      ],
+      "checklist": [
+        "Reproduzi um dirty read e expliquei a linha do tempo das duas transações",
+        "Explico por que o PostgreSQL não sofre dirty reads mesmo em READ UNCOMMITTED"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Desenhar a linha do tempo de duas transações que produzem um dirty read"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Reproduzir dirty read no MySQL com duas sessões em READ UNCOMMITTED"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Tentar o mesmo no PostgreSQL e explicar por que não acontece"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Existe algum caso legítimo para usar READ UNCOMMITTED em produção?"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Escrever um teste JDBC automatizado que verifica que o banco da aplicação nunca expõe dirty reads"
+        }
+      ]
+    },
+    "3.2.5": {
+      "summary": "Non-repeatable read ocorre quando a mesma linha, lida duas vezes na mesma transação, retorna valores diferentes porque outra transação a alterou e confirmou entre as leituras. Afeta Read Committed e é eliminado com snapshots por transação.",
+      "objectives": [
+        "Definir non-repeatable read e distingui-lo de dirty read",
+        "Reproduzir o fenômeno em READ COMMITTED no PostgreSQL",
+        "Explicar por que snapshot por comando (Read Committed) versus por transação (Repeatable Read) muda o resultado",
+        "Identificar bugs de negócio causados pelo fenômeno (ex.: relatórios inconsistentes)"
+      ],
+      "estimatedMinutes": 40,
+      "prerequisites": [
+        {
+          "key": "3.2.4",
+          "kind": "recommended",
+          "reason": "Comparar com dirty read esclarece a diferença entre dados confirmados e não confirmados"
+        }
+      ],
+      "checklist": [
+        "Reproduzi um non-repeatable read com duas sessões psql",
+        "Eliminei o fenômeno trocando o nível de isolamento e expliquei por quê"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar a diferença entre non-repeatable read e dirty read com um exemplo de saldo"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Reproduzir um non-repeatable read com duas sessões psql em READ COMMITTED"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Encontrar a causa de um relatório cujo total não bate com a soma das linhas"
+        },
+        {
+          "level": 3,
+          "type": "coding",
+          "title": "Escrever um teste JDBC com duas conexões que demonstra o fenômeno de forma determinística"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Gerar um relatório financeiro consistente em Java usando REPEATABLE READ READ ONLY"
+        }
+      ]
+    },
+    "3.2.6": {
+      "summary": "Phantom read ocorre quando uma consulta por predicado retorna um conjunto diferente de linhas na mesma transação porque outra inseriu ou removeu linhas que satisfazem o predicado. Relaciona-se com predicate locks, gap locks e Serializable.",
+      "objectives": [
+        "Definir phantom read e diferenciá-lo de non-repeatable read",
+        "Reproduzir phantoms em READ COMMITTED no PostgreSQL",
+        "Explicar como InnoDB usa gap/next-key locks e PostgreSQL usa snapshots/SSI",
+        "Reconhecer padrões de check-then-insert vulneráveis a phantoms"
+      ],
+      "estimatedMinutes": 50,
+      "prerequisites": [
+        {
+          "key": "3.2.5",
+          "kind": "recommended",
+          "reason": "Phantom read é a generalização do non-repeatable read para conjuntos de linhas"
+        }
+      ],
+      "checklist": [
+        "Reproduzi um phantom read com duas sessões",
+        "Explico por que um check-then-insert de reserva de horário pode gerar duplicidade",
+        "Proponho ao menos duas soluções (constraint única, Serializable, lock explícito)"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar por que travar as linhas lidas não impede phantoms"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Reproduzir um phantom read com duas sessões psql em READ COMMITTED"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Corrigir um sistema de agendamento que permite duas reservas no mesmo horário"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Como o InnoDB evita phantoms em REPEATABLE READ usando next-key locks?"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar reservas sem sobreposição usando exclusion constraint do PostgreSQL"
+        }
+      ]
+    },
+    "3.2.7": {
+      "summary": "Locks coordenam o acesso concorrente a dados: locks de linha, de tabela, compartilhados e exclusivos, adquiridos implícita ou explicitamente. Abrange modos de lock do PostgreSQL, filas de espera, lock_timeout e como índices afetam o escopo do lock.",
+      "objectives": [
+        "Diferenciar locks compartilhados e exclusivos e sua matriz de compatibilidade",
+        "Identificar quais comandos adquirem quais locks (UPDATE, SELECT FOR UPDATE, ALTER TABLE)",
+        "Inspecionar locks ativos e bloqueios com pg_locks e pg_blocking_pids",
+        "Explicar por que um DDL pode travar toda a aplicação ao esperar na fila de locks",
+        "Explicar como índices reduzem o número de linhas travadas"
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        {
+          "key": "3.2.3",
+          "kind": "recommended",
+          "reason": "Locks são um dos mecanismos que implementam isolamento"
+        },
+        {
+          "key": "3.4.6",
+          "kind": "recommended",
+          "reason": "O uso de índices determina quantas linhas uma operação precisa examinar e travar"
+        }
+      ],
+      "checklist": [
+        "Identifiquei qual sessão bloqueia outra usando pg_locks",
+        "Explico por que um ALTER TABLE simples pode derrubar a disponibilidade",
+        "Uso lock_timeout e statement_timeout para limitar esperas"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Montar a matriz de compatibilidade entre os principais modos de lock do PostgreSQL"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Bloquear uma sessão com UPDATE não confirmado e encontrar o bloqueador via pg_blocking_pids"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Mostrar um ALTER TABLE esperando um lock e enfileirando todos os SELECTs seguintes"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Por que uma migração em produção deve usar lock_timeout?"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Criar uma consulta de monitoramento que lista cadeias de bloqueio com tempo de espera e SQL"
+        }
+      ]
+    },
+    "3.2.8": {
+      "summary": "Deadlock é um ciclo de espera entre transações que mantêm locks e aguardam locks umas das outras. O banco detecta o ciclo e aborta uma vítima; a prevenção envolve ordem consistente de aquisição e transações curtas.",
+      "objectives": [
+        "Explicar as condições necessárias para deadlock e o grafo de espera",
+        "Reproduzir um deadlock com duas sessões e ler a mensagem de erro do banco",
+        "Explicar como o detector de deadlocks do PostgreSQL funciona (deadlock_timeout)",
+        "Prevenir deadlocks com ordenação de acesso e retry na aplicação"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "3.2.7",
+          "kind": "required",
+          "reason": "Deadlocks surgem da forma como locks são adquiridos"
+        },
+        {
+          "key": "2.4.9",
+          "kind": "recommended",
+          "reason": "Detecção de deadlock é detecção de ciclo em um grafo de espera"
+        }
+      ],
+      "checklist": [
+        "Reproduzi um deadlock e interpretei o log do PostgreSQL",
+        "Corrigi um código que causava deadlock ordenando os acessos",
+        "Implementei retry para a transação vítima"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Desenhar o grafo de espera de um deadlock entre duas transferências opostas"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Reproduzir um deadlock com duas sessões psql atualizando duas contas em ordem inversa"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Encontrar a causa de deadlocks intermitentes em um job de atualização em lote"
+        },
+        {
+          "level": 3,
+          "type": "coding",
+          "title": "Corrigir transferências ordenando os locks por id da conta e provar com teste concorrente"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar em Java um detector de ciclos em grafo de espera simulado"
+        }
+      ]
+    },
+    "3.2.9": {
+      "summary": "Optimistic locking assume que conflitos são raros: lê sem travar e valida no momento da escrita usando uma coluna de versão, rejeitando atualizações concorrentes. Resolve lost updates com baixo custo sob baixa contenção.",
+      "objectives": [
+        "Explicar o problema de lost update em fluxos ler-modificar-escrever",
+        "Implementar versionamento com UPDATE ... WHERE id = ? AND version = ?",
+        "Tratar conflitos (0 linhas afetadas) com retry ou resposta ao cliente",
+        "Relacionar com @Version do JPA e ETag/If-Match em APIs HTTP",
+        "Identificar quando a alta contenção torna a estratégia ineficiente"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "3.2.3",
+          "kind": "recommended",
+          "reason": "Lost update é uma anomalia ligada ao nível de isolamento"
+        }
+      ],
+      "checklist": [
+        "Reproduzi um lost update e o eliminei com coluna de versão",
+        "Explico o que a aplicação deve fazer quando a atualização afeta 0 linhas",
+        "Explico como ETag e 412 Precondition Failed aplicam a mesma ideia no HTTP"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar como dois usuários editando o mesmo registro perdem dados sem versionamento"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Implementar update otimista com coluna version em JDBC e detectar conflito"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Medir taxa de conflitos e retries sob 50 threads disputando o mesmo registro"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Quando optimistic locking é pior que pessimistic locking?"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Criar endpoint de edição com ETag/If-Match que responde 412 em conflito"
+        }
+      ]
+    },
+    "3.2.10": {
+      "summary": "Pessimistic locking trava explicitamente os dados antes de alterá-los (SELECT ... FOR UPDATE), serializando o acesso concorrente. Inclui NOWAIT, SKIP LOCKED e o uso como fila de trabalho.",
+      "objectives": [
+        "Usar SELECT ... FOR UPDATE / FOR SHARE corretamente dentro de transações",
+        "Explicar NOWAIT e SKIP LOCKED e seus casos de uso",
+        "Implementar uma fila de jobs concorrente com FOR UPDATE SKIP LOCKED",
+        "Avaliar o impacto em throughput e risco de deadlock"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "3.2.7",
+          "kind": "required",
+          "reason": "Pessimistic locking é o uso explícito de locks de linha"
+        },
+        {
+          "key": "3.2.9",
+          "kind": "recommended",
+          "reason": "A comparação com a abordagem otimista orienta a escolha"
+        }
+      ],
+      "checklist": [
+        "Implementei decremento de estoque seguro com SELECT FOR UPDATE",
+        "Implementei uma fila com SKIP LOCKED processada por vários workers sem duplicidade",
+        "Explico quando prefiro otimista e quando prefiro pessimista"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Comparar otimista e pessimista em contenção, latência e risco de deadlock"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Implementar reserva de estoque com SELECT ... FOR UPDATE em JDBC"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Observar a diferença entre FOR UPDATE, NOWAIT e SKIP LOCKED com duas sessões"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Corrigir um código que faz SELECT FOR UPDATE com autocommit ligado e não trava nada"
+        },
+        {
+          "level": 4,
+          "type": "project",
+          "title": "Construir uma fila de jobs em PostgreSQL consumida por múltiplos workers Java com SKIP LOCKED"
+        }
+      ]
+    },
+    "3.2.11": {
+      "summary": "MVCC (Multi-Version Concurrency Control) mantém várias versões de cada linha para que leitores não bloqueiem escritores. No PostgreSQL, tuplas carregam xmin/xmax, a visibilidade é decidida por snapshots e versões mortas são removidas pelo VACUUM.",
+      "objectives": [
+        "Explicar como xmin, xmax e snapshots determinam a visibilidade de uma tupla",
+        "Explicar por que um UPDATE no PostgreSQL cria uma nova versão da linha",
+        "Entender bloat, VACUUM, autovacuum e HOT updates",
+        "Explicar o risco de transaction ID wraparound",
+        "Comparar MVCC do PostgreSQL (versões na tabela) com InnoDB (undo log)"
+      ],
+      "estimatedMinutes": 120,
+      "prerequisites": [
+        {
+          "key": "3.2.3",
+          "kind": "required",
+          "reason": "MVCC é o mecanismo que implementa os níveis de isolamento por snapshot"
+        },
+        {
+          "key": "3.4.6",
+          "kind": "recommended",
+          "reason": "Novas versões de linha também afetam índices e motivam HOT updates"
+        },
+        {
+          "key": "3.4.7",
+          "kind": "recommended",
+          "reason": "Entender páginas e estrutura física ajuda a compreender bloat"
+        }
+      ],
+      "checklist": [
+        "Observei xmin/xmax e ctid mudando após UPDATE e DELETE",
+        "Expliquei por que uma transação longa impede o VACUUM de limpar tuplas mortas",
+        "Medi bloat de uma tabela antes e depois do VACUUM",
+        "Explico o que é wraparound e por que o autovacuum o previne"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar como leitores e escritores não se bloqueiam sob MVCC"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Consultar xmin, xmax e ctid antes e depois de UPDATE em duas sessões psql"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Usar pageinspect para ver tuplas mortas e o efeito do VACUUM na página"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Investigar uma tabela que cresce sem parar por causa de uma transação 'idle in transaction'"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Compare o MVCC do PostgreSQL com o do InnoDB: onde ficam as versões antigas e qual o custo?"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar em Java um key-value store em memória com MVCC e snapshots por transação"
+        }
+      ]
+    },
+    "3.2.12": {
+      "summary": "Replicação mantém cópias dos dados em múltiplos servidores para disponibilidade e escala de leitura. Abrange replicação física por streaming de WAL, lógica, síncrona versus assíncrona, replication lag e failover.",
+      "objectives": [
+        "Explicar replicação primary-replica por streaming de WAL",
+        "Comparar replicação síncrona e assíncrona em latência e risco de perda de dados",
+        "Explicar replication lag e anomalias como 'ler minha própria escrita'",
+        "Diferenciar replicação física e lógica",
+        "Entender o roteamento de leituras para réplicas em aplicações Java"
+      ],
+      "estimatedMinutes": 90,
+      "prerequisites": [
+        {
+          "key": "3.2.2",
+          "kind": "recommended",
+          "reason": "Replicação física se baseia no WAL usado para durabilidade"
+        },
+        {
+          "key": "3.2.11",
+          "kind": "recommended",
+          "reason": "Consultas em réplicas sofrem conflitos com a limpeza de versões"
+        }
+      ],
+      "checklist": [
+        "Configurei uma réplica de streaming (ex.: com Docker) e medi o lag",
+        "Explico quanto dado pode ser perdido em failover com replicação assíncrona",
+        "Proponho solução para read-your-writes com réplicas de leitura"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Comparar replicação síncrona e assíncrona em latência de commit e RPO"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Subir primary e réplica PostgreSQL com Docker e acompanhar pg_stat_replication"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Explicar por que o usuário não vê o pedido recém-criado ao ler de uma réplica"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Como você faria failover de um primary sem causar split-brain?"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar roteamento de leitura/escrita entre dois DataSources em Java"
+        }
+      ]
+    },
+    "3.3.1": {
+      "summary": "Logs registram eventos discretos da aplicação para diagnóstico. Abrange níveis, logs estruturados (JSON), correlation IDs, MDC no SLF4J/Logback, custo de logging e cuidados com dados sensíveis.",
+      "objectives": [
+        "Escolher níveis de log adequados (ERROR, WARN, INFO, DEBUG) com critério",
+        "Produzir logs estruturados em JSON com campos consistentes",
+        "Propagar um correlation ID por requisição usando MDC",
+        "Evitar vazamento de dados sensíveis (senhas, tokens, PII)",
+        "Entender o custo de logging síncrono e o uso de appenders assíncronos"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "3.1.8",
+          "kind": "recommended",
+          "reason": "Logs de serviços backend giram em torno do ciclo de requisições HTTP"
+        }
+      ],
+      "checklist": [
+        "Configurei logs JSON com correlation ID em uma aplicação Java",
+        "Consigo rastrear todas as linhas de uma requisição específica pelo ID",
+        "Revisei um código e removi logs com dados sensíveis"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Definir critérios objetivos para ERROR versus WARN em um serviço de pagamentos"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Configurar Logback com saída JSON e correlation ID via MDC em um filtro HTTP"
+        },
+        {
+          "level": 2,
+          "type": "code_analysis",
+          "title": "Revisar logs de um serviço e apontar vazamentos de PII e tokens"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Descobrir por que o correlation ID some em logs de código executado em outra thread"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Medir o impacto de latência de logging síncrono em disco versus appender assíncrono"
+        },
+        {
+          "level": 4,
+          "type": "project",
+          "title": "Centralizar logs JSON de dois serviços em Loki/ELK e buscar uma requisição pelo correlation ID"
+        }
+      ]
+    },
+    "3.3.2": {
+      "summary": "Métricas são medições numéricas agregadas ao longo do tempo (contadores, gauges, histogramas) usadas para monitorar e alertar. Abrange os métodos RED/USE, percentis, cardinalidade de labels e Micrometer/Prometheus.",
+      "objectives": [
+        "Diferenciar counter, gauge, histogram e summary e quando usar cada um",
+        "Explicar por que média de latência engana e como percentis (p95, p99) são calculados",
+        "Aplicar os métodos RED (rate, errors, duration) e USE (utilization, saturation, errors)",
+        "Evitar explosão de cardinalidade em labels",
+        "Expor métricas de uma aplicação Java com Micrometer para Prometheus"
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        {
+          "key": "3.3.1",
+          "kind": "recommended",
+          "reason": "Comparar logs e métricas esclarece quando usar cada sinal"
+        }
+      ],
+      "checklist": [
+        "Expus métricas RED de um endpoint e consultei em PromQL",
+        "Explico por que não se pode tirar a média de percentis entre instâncias",
+        "Identifico um label que causaria explosão de cardinalidade"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar por que a latência média esconde problemas que o p99 revela"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Instrumentar um endpoint com Micrometer (counter de erros e timer com histograma)"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Subir Prometheus localmente e escrever consultas rate() e histogram_quantile()"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Diagnosticar um Prometheus sem memória causado por label com userId"
+        },
+        {
+          "level": 4,
+          "type": "project",
+          "title": "Montar um dashboard RED com alertas para uma API de exemplo"
+        }
+      ]
+    },
+    "3.3.3": {
+      "summary": "Tracing distribuído acompanha uma requisição através de vários serviços, registrando spans com relações causais e tempos. Abrange trace/span IDs, propagação de contexto (W3C traceparent), amostragem e OpenTelemetry.",
+      "objectives": [
+        "Explicar traces, spans, relações pai-filho e atributos",
+        "Explicar como o contexto é propagado entre serviços via headers W3C traceparent",
+        "Comparar estratégias de amostragem (head-based e tail-based)",
+        "Instrumentar uma aplicação Java com o agente OpenTelemetry",
+        "Usar um trace para localizar o serviço ou query responsável pela latência"
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        {
+          "key": "3.3.1",
+          "kind": "recommended",
+          "reason": "Tracing complementa logs correlacionados"
+        },
+        {
+          "key": "3.1.8",
+          "kind": "recommended",
+          "reason": "A propagação de contexto usa headers HTTP"
+        }
+      ],
+      "checklist": [
+        "Visualizei um trace envolvendo dois serviços e um banco no Jaeger/Tempo",
+        "Explico como o trace ID atravessa uma chamada HTTP",
+        "Liguei logs ao trace incluindo trace_id no MDC"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Desenhar a árvore de spans de uma requisição que passa por gateway, serviço e banco"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Instrumentar dois serviços Java com o agente OpenTelemetry e visualizar no Jaeger"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Descobrir por que o trace se quebra em dois ao passar por uma fila ou thread pool"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Quais os trade-offs entre amostragem head-based e tail-based?"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Propagar manualmente o header traceparent em um cliente HTTP sem instrumentação automática"
+        }
+      ]
+    },
+    "3.3.4": {
+      "summary": "Observabilidade é a capacidade de entender o estado interno de um sistema a partir de seus sinais externos, permitindo investigar falhas desconhecidas. Integra logs, métricas e traces com correlação e investigação orientada a hipóteses.",
+      "objectives": [
+        "Diferenciar monitoramento (perguntas conhecidas) de observabilidade (perguntas novas)",
+        "Combinar métricas, traces e logs em um fluxo de investigação",
+        "Definir quais sinais instrumentar em um novo serviço",
+        "Escrever alertas acionáveis baseados em sintomas, não em causas"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "3.3.1",
+          "kind": "required",
+          "reason": "Logs são um dos pilares"
+        },
+        {
+          "key": "3.3.2",
+          "kind": "required",
+          "reason": "Métricas são um dos pilares"
+        },
+        {
+          "key": "3.3.3",
+          "kind": "required",
+          "reason": "Traces são um dos pilares"
+        }
+      ],
+      "checklist": [
+        "Investiguei um problema partindo de um alerta de métrica até o log da causa via trace",
+        "Escrevi um plano de instrumentação para um serviço novo",
+        "Diferencio alerta por sintoma de alerta por causa"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar a diferença entre monitoramento e observabilidade com um incidente real"
+        },
+        {
+          "level": 2,
+          "type": "code_analysis",
+          "title": "Revisar um conjunto de alertas e reescrever os não acionáveis"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Injetar latência em uma dependência e diagnosticá-la usando só os sinais disponíveis"
+        },
+        {
+          "level": 4,
+          "type": "project",
+          "title": "Montar stack local (Prometheus, Grafana, Jaeger, Loki) para um app Java e correlacionar os três sinais"
+        }
+      ]
+    },
+    "3.3.5": {
+      "summary": "Health checks expõem o estado de uma instância para orquestradores e load balancers. Abrange liveness, readiness e startup probes, dependências nos checks e os riscos de falhas em cascata.",
+      "objectives": [
+        "Diferenciar liveness, readiness e startup probes",
+        "Decidir quais dependências devem afetar a readiness e nunca a liveness",
+        "Configurar endpoints de health no Spring Boot Actuator",
+        "Explicar como health checks mal projetados causam falhas em cascata",
+        "Implementar graceful shutdown coordenado com readiness"
+      ],
+      "estimatedMinutes": 50,
+      "prerequisites": [
+        {
+          "key": "3.1.8",
+          "kind": "recommended",
+          "reason": "Health checks são normalmente endpoints HTTP"
+        }
+      ],
+      "checklist": [
+        "Explico por que checar o banco na liveness pode reiniciar todo o cluster",
+        "Configurei probes separados em uma aplicação",
+        "Implementei shutdown que para de receber tráfego antes de encerrar"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar a diferença entre liveness e readiness e o que o orquestrador faz em cada falha"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Expor liveness e readiness com Spring Boot Actuator incluindo um indicador customizado"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Analisar um incidente em que a queda do banco reiniciou todos os pods em loop"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Testar graceful shutdown enviando SIGTERM durante requisições em andamento"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar readiness que reflete pool de banco esgotado e graceful shutdown com drenagem"
+        }
+      ]
+    },
+    "3.3.6": {
+      "summary": "SLIs são indicadores quantitativos de qualidade do serviço (ex.: proporção de requisições bem-sucedidas abaixo de 300ms) e SLOs são metas sobre eles. Abrange error budget, burn rate e diferença para SLA.",
+      "objectives": [
+        "Definir SLIs a partir da experiência do usuário",
+        "Estabelecer SLOs e calcular o error budget correspondente",
+        "Diferenciar SLI, SLO e SLA",
+        "Criar alertas por burn rate em múltiplas janelas",
+        "Usar o error budget para decidir entre velocidade de entrega e estabilidade"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "3.3.2",
+          "kind": "required",
+          "reason": "SLIs são calculados a partir de métricas"
+        }
+      ],
+      "checklist": [
+        "Calculo quanto downtime por mês um SLO de 99,9% permite",
+        "Defini SLIs e SLOs para uma API de exemplo",
+        "Explico um alerta de burn rate e por que ele é melhor que um limiar fixo"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Calcular o error budget mensal de SLOs de 99%, 99,9% e 99,99%"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Escrever consultas PromQL que calculam um SLI de disponibilidade e latência"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Por que um SLO de 100% é uma má ideia?"
+        },
+        {
+          "level": 4,
+          "type": "project",
+          "title": "Definir SLOs e alertas multi-window burn rate para a API do módulo"
+        }
+      ]
+    },
+    "3.3.7": {
+      "summary": "CI/CD automatiza build, testes e entrega de software: integração contínua valida cada mudança e entrega/deploy contínuo leva artefatos imutáveis até produção. Abrange pipelines, estágios, artefatos versionados e gates de qualidade.",
+      "objectives": [
+        "Diferenciar continuous integration, continuous delivery e continuous deployment",
+        "Montar um pipeline com build, testes, análise e publicação de artefato",
+        "Explicar a importância de artefatos imutáveis promovidos entre ambientes",
+        "Integrar testes com banco real (Testcontainers) no pipeline",
+        "Gerenciar segredos no pipeline sem expô-los"
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [],
+      "checklist": [
+        "Criei um pipeline (ex.: GitHub Actions) que compila, testa e gera imagem Docker",
+        "Explico por que não se deve reconstruir o artefato por ambiente",
+        "O pipeline falha corretamente quando um teste quebra"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Diferenciar continuous delivery de continuous deployment com exemplos"
+        },
+        {
+          "level": 2,
+          "type": "implementation",
+          "title": "Criar um workflow GitHub Actions que compila com Maven, roda testes e publica uma imagem Docker"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Corrigir um pipeline que vaza um segredo nos logs"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Como tornar um pipeline lento (40 min) rápido sem perder confiança?"
+        },
+        {
+          "level": 4,
+          "type": "project",
+          "title": "Pipeline completo com testes Testcontainers, versionamento semântico e deploy em ambiente de staging"
+        }
+      ]
+    },
+    "3.3.8": {
+      "summary": "Rolling deployment substitui instâncias gradualmente pela nova versão, mantendo capacidade durante a troca. Exige compatibilidade entre versões coexistentes, readiness correta e controle de maxSurge/maxUnavailable.",
+      "objectives": [
+        "Explicar como o rolling deployment substitui instâncias em lotes",
+        "Configurar parâmetros como maxSurge e maxUnavailable",
+        "Garantir compatibilidade entre a versão antiga e a nova rodando simultaneamente",
+        "Identificar riscos de drenagem de conexões e requisições em andamento"
+      ],
+      "estimatedMinutes": 45,
+      "prerequisites": [
+        {
+          "key": "3.3.5",
+          "kind": "required",
+          "reason": "O avanço do rollout depende da readiness das novas instâncias"
+        },
+        {
+          "key": "3.3.7",
+          "kind": "recommended",
+          "reason": "Deploys são acionados pelo pipeline"
+        }
+      ],
+      "checklist": [
+        "Executei um rolling update sem erros para o cliente",
+        "Explico por que uma mudança de contrato incompatível quebra durante o rollout",
+        "Configurei os parâmetros de surge e indisponibilidade"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Descrever passo a passo um rolling update de 4 réplicas com maxSurge=1 e maxUnavailable=0"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Fazer rolling update em um cluster local (kind/minikube) enquanto um script mede erros"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Explicar erros 502 durante o rollout causados por ausência de graceful shutdown"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Como fazer rolling deploy de uma mudança que renomeia um campo da API?"
+        },
+        {
+          "level": 4,
+          "type": "project",
+          "title": "Automatizar um rolling deploy com verificação pós-deploy e interrupção em caso de aumento de erros"
+        }
+      ]
+    },
+    "3.3.9": {
+      "summary": "Blue/green deployment mantém dois ambientes completos e troca o tráfego de uma vez da versão atual (blue) para a nova (green), permitindo rollback instantâneo. Custa capacidade dobrada e exige cuidado com banco compartilhado.",
+      "objectives": [
+        "Explicar o fluxo blue/green e o ponto de troca de tráfego",
+        "Comparar custo e risco com rolling deployment",
+        "Lidar com banco de dados compartilhado e migrações compatíveis",
+        "Validar o ambiente green antes da troca"
+      ],
+      "estimatedMinutes": 45,
+      "prerequisites": [
+        {
+          "key": "3.3.8",
+          "kind": "recommended",
+          "reason": "A comparação com rolling esclarece trade-offs"
+        }
+      ],
+      "checklist": [
+        "Simulei uma troca blue/green com um proxy reverso",
+        "Explico por que o rollback instantâneo pode falhar se o schema mudou",
+        "Listo os custos operacionais da estratégia"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Comparar blue/green e rolling em custo, velocidade de rollback e risco"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Simular blue/green com duas versões de um app e troca de upstream no nginx"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Como lidar com a migração de banco em um deploy blue/green?"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Analisar sessões perdidas após troca blue/green em um app com sessão em memória"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Script de troca blue/green com smoke tests no green e reversão automática"
+        }
+      ]
+    },
+    "3.3.10": {
+      "summary": "Canary deployment expõe a nova versão a uma pequena fração do tráfego, compara métricas com a versão estável e expande gradualmente. Depende de roteamento ponderado e análise automática baseada em SLIs.",
+      "objectives": [
+        "Explicar o fluxo canary e critérios de promoção e aborto",
+        "Definir métricas comparativas entre canary e baseline",
+        "Configurar roteamento ponderado de tráfego",
+        "Entender limitações estatísticas com pouco tráfego"
+      ],
+      "estimatedMinutes": 50,
+      "prerequisites": [
+        {
+          "key": "3.3.6",
+          "kind": "recommended",
+          "reason": "A decisão de promover o canary usa SLIs"
+        },
+        {
+          "key": "3.3.8",
+          "kind": "recommended",
+          "reason": "Canary evolui as ideias do rollout gradual"
+        }
+      ],
+      "checklist": [
+        "Defini critérios objetivos de aborto para um canary",
+        "Configurei divisão de tráfego 95/5 entre duas versões",
+        "Explico por que um canary com tráfego muito baixo pode dar falsa confiança"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar como um canary reduz o raio de impacto de um bug"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Configurar split de tráfego 95/5 com nginx weight e comparar taxas de erro"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Quais métricas você compararia entre canary e baseline e por quê?"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Escrever um script que analisa métricas do Prometheus e decide promover ou abortar o canary"
+        }
+      ]
+    },
+    "3.3.11": {
+      "summary": "Rollback reverte um deploy problemático para a versão anterior conhecida como estável. Abrange rollback de código versus banco, migrações expand/contract, roll forward e feature flags.",
+      "objectives": [
+        "Planejar rollback antes de cada deploy",
+        "Aplicar o padrão expand/contract para migrações reversíveis",
+        "Decidir entre rollback e roll forward em um incidente",
+        "Usar feature flags para desligar funcionalidades sem novo deploy"
+      ],
+      "estimatedMinutes": 50,
+      "prerequisites": [
+        {
+          "key": "3.3.8",
+          "kind": "recommended",
+          "reason": "Rollback depende da estratégia de deploy usada"
+        },
+        {
+          "key": "3.2.1",
+          "kind": "recommended",
+          "reason": "Migrações de schema e dados envolvem transações"
+        }
+      ],
+      "checklist": [
+        "Planejei uma migração de renomeação de coluna em passos expand/contract",
+        "Explico por que rollback de código não desfaz dados já gravados no formato novo",
+        "Executei um rollback de versão em ambiente local"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar por que migrações destrutivas impedem rollback"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Escrever migrações Flyway expand/contract para renomear uma coluna sem downtime"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Durante um incidente pós-deploy, quando escolher rollback e quando roll forward?"
+        },
+        {
+          "level": 4,
+          "type": "project",
+          "title": "Elaborar um runbook de deploy e rollback para a API do módulo, incluindo banco e feature flags"
+        }
+      ]
+    },
+    "3.4.1": {
+      "summary": "O modelo relacional representa dados como relações (tabelas) de tuplas com atributos tipados, manipuladas por álgebra relacional. Abrange chaves, dependências funcionais, normalização (1FN a 3FN/BCNF) e quando desnormalizar.",
+      "objectives": [
+        "Explicar relação, tupla, atributo e domínio",
+        "Aplicar normalização até a 3FN identificando dependências funcionais",
+        "Modelar relacionamentos 1:1, 1:N e N:N",
+        "Relacionar operações da álgebra relacional (seleção, projeção, junção) com SQL",
+        "Avaliar quando desnormalizar por desempenho"
+      ],
+      "estimatedMinutes": 90,
+      "prerequisites": [],
+      "checklist": [
+        "Normalizei uma planilha desnormalizada até a 3FN",
+        "Modelei um domínio com relacionamento N:N via tabela associativa",
+        "Justifico uma desnormalização com custo e benefício"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Identificar anomalias de inserção, atualização e exclusão em uma tabela não normalizada"
+        },
+        {
+          "level": 2,
+          "type": "implementation",
+          "title": "Normalizar uma planilha de pedidos até a 3FN e desenhar o diagrama ER"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Quando você desnormalizaria um modelo e como manteria a consistência?"
+        },
+        {
+          "level": 4,
+          "type": "project",
+          "title": "Modelar o schema de um sistema de biblioteca com empréstimos, reservas e multas"
+        }
+      ]
+    },
+    "3.4.2": {
+      "summary": "SQL é a linguagem declarativa para definir, consultar e manipular dados relacionais. Abrange DDL, DML, filtros, agregações, GROUP BY/HAVING, subconsultas, CTEs, window functions e a ordem lógica de avaliação de uma consulta.",
+      "objectives": [
+        "Escrever DDL (CREATE, ALTER) e DML (INSERT, UPDATE, DELETE) corretamente",
+        "Usar agregações com GROUP BY e HAVING",
+        "Explicar a ordem lógica de execução (FROM, WHERE, GROUP BY, HAVING, SELECT, ORDER BY)",
+        "Usar subconsultas, CTEs e window functions",
+        "Entender a semântica de NULL e da lógica de três valores"
+      ],
+      "estimatedMinutes": 150,
+      "prerequisites": [
+        {
+          "key": "3.4.1",
+          "kind": "recommended",
+          "reason": "SQL opera sobre o modelo relacional"
+        }
+      ],
+      "checklist": [
+        "Resolvi consultas com agregação, CTE e window function sem consultar referência",
+        "Explico por que WHERE col = NULL nunca retorna linhas",
+        "Explico por que um alias do SELECT não pode ser usado no WHERE"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Ordenar as cláusulas de um SELECT na ordem lógica de avaliação e justificar"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Resolver 10 consultas sobre um schema de e-commerce (agregações, HAVING, subconsultas)"
+        },
+        {
+          "level": 2,
+          "type": "bug_hunt",
+          "title": "Corrigir consultas com resultados errados por causa de NULL em NOT IN e comparações"
+        },
+        {
+          "level": 3,
+          "type": "coding",
+          "title": "Calcular ranking e total acumulado de vendas por cliente com window functions"
+        },
+        {
+          "level": 4,
+          "type": "project",
+          "title": "Criar um relatório analítico completo com CTEs encadeadas sobre o schema do módulo"
+        }
+      ]
+    },
+    "3.4.3": {
+      "summary": "Joins combinam linhas de tabelas por uma condição: INNER, LEFT/RIGHT, FULL, CROSS, self-join, semi e anti-join. Inclui armadilhas como multiplicação de linhas e filtros no ON versus WHERE.",
+      "objectives": [
+        "Escolher o tipo de join correto para cada pergunta de negócio",
+        "Explicar a diferença entre condição no ON e no WHERE em LEFT JOIN",
+        "Identificar e corrigir duplicação de linhas causada por joins 1:N",
+        "Implementar semi-join (EXISTS) e anti-join (NOT EXISTS)",
+        "Usar self-join para hierarquias simples"
+      ],
+      "estimatedMinutes": 90,
+      "prerequisites": [
+        {
+          "key": "3.4.2",
+          "kind": "required",
+          "reason": "Joins são uma construção da linguagem SQL"
+        }
+      ],
+      "checklist": [
+        "Explico a diferença de resultado ao mover um filtro do ON para o WHERE num LEFT JOIN",
+        "Corrigi uma soma inflada por join com tabela 1:N",
+        "Escrevi um anti-join para encontrar clientes sem pedidos"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Prever o resultado de INNER, LEFT e FULL JOIN entre duas tabelas pequenas"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Listar clientes sem pedidos de três formas (LEFT JOIN/IS NULL, NOT EXISTS, NOT IN)"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Encontrar por que o faturamento total dobrou após adicionar um join com pagamentos"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Qual a diferença entre filtrar no ON e no WHERE de um LEFT JOIN?"
+        },
+        {
+          "level": 4,
+          "type": "project",
+          "title": "Construir um relatório de vendas por categoria e cliente com joins múltiplos sem duplicação de valores"
+        }
+      ]
+    },
+    "3.4.4": {
+      "summary": "Primary key identifica unicamente cada linha, implicando NOT NULL e unicidade com um índice associado. Abrange chaves naturais versus surrogate, sequences/identity, UUID v4 versus v7 e impacto físico da escolha.",
+      "objectives": [
+        "Explicar as garantias de uma primary key e o índice criado automaticamente",
+        "Comparar chaves naturais e surrogate",
+        "Comparar BIGINT identity, UUID v4 e UUID v7 quanto a localidade de inserção no índice",
+        "Definir chaves compostas quando apropriado"
+      ],
+      "estimatedMinutes": 45,
+      "prerequisites": [
+        {
+          "key": "3.4.1",
+          "kind": "recommended",
+          "reason": "Chaves são conceito central do modelo relacional"
+        }
+      ],
+      "checklist": [
+        "Justifico a escolha do tipo de PK para uma tabela de alto volume",
+        "Explico por que UUID aleatório fragmenta índices B+ Tree",
+        "Sei quando uma chave composta é preferível"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Listar riscos de usar CPF ou e-mail como primary key"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Criar tabelas com IDENTITY, UUID e chave composta e inspecionar os índices gerados"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Comparar tempo de inserção e tamanho do índice com PK BIGINT, UUID v4 e UUID v7 em 5 milhões de linhas"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Por que expor IDs sequenciais em uma API pode ser um problema e como mitigar?"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar em Java um gerador de UUID v7 e validar sua ordenação temporal"
+        }
+      ]
+    },
+    "3.4.5": {
+      "summary": "Foreign key garante integridade referencial entre tabelas, impedindo referências a linhas inexistentes. Abrange ações ON DELETE/ON UPDATE, custo de verificação, necessidade de índice na coluna referenciadora e constraints adiáveis.",
+      "objectives": [
+        "Explicar a integridade referencial garantida pela foreign key",
+        "Escolher ações ON DELETE (RESTRICT, CASCADE, SET NULL) conforme o domínio",
+        "Explicar por que a coluna da FK geralmente precisa de índice",
+        "Usar constraints DEFERRABLE quando necessário",
+        "Avaliar o custo das FKs em cargas de escrita intensa"
+      ],
+      "estimatedMinutes": 45,
+      "prerequisites": [
+        {
+          "key": "3.4.4",
+          "kind": "required",
+          "reason": "Uma foreign key referencia uma chave primária ou única"
+        }
+      ],
+      "checklist": [
+        "Escolhi ações ON DELETE coerentes para um modelo de pedidos",
+        "Mostrei com EXPLAIN o custo de deletar um pai sem índice na FK",
+        "Explico quando CASCADE é perigoso"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar o que acontece ao deletar um cliente com pedidos em cada ação ON DELETE"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Definir FKs com ações adequadas para clientes, pedidos e itens"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Medir o DELETE de linhas pai com e sem índice na coluna FK da tabela filha"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Algumas empresas não usam foreign keys em produção. Quais os argumentos e riscos?"
+        },
+        {
+          "level": 4,
+          "type": "project",
+          "title": "Modelar o schema completo de pedidos com FKs, índices nas FKs e políticas ON DELETE documentadas"
+        }
+      ]
+    },
+    "3.4.6": {
+      "summary": "Índices são estruturas auxiliares que aceleram buscas ao evitar varredura completa, ao custo de espaço e escrita. Abrange índices compostos e a regra do prefixo à esquerda, seletividade, índices de cobertura, parciais, de expressão e tipos (B-tree, hash, GIN).",
+      "objectives": [
+        "Explicar o trade-off de leitura versus escrita e espaço",
+        "Aplicar a regra do prefixo à esquerda em índices compostos",
+        "Usar índices de cobertura (INCLUDE) para index-only scans",
+        "Criar índices parciais e de expressão",
+        "Identificar consultas que não usam índice (funções na coluna, baixa seletividade, LIKE '%x')"
+      ],
+      "estimatedMinutes": 120,
+      "prerequisites": [
+        {
+          "key": "3.4.2",
+          "kind": "required",
+          "reason": "Índices servem às consultas SQL"
+        },
+        {
+          "key": "2.4.6",
+          "kind": "recommended",
+          "reason": "Árvores de busca são a base conceitual dos índices"
+        },
+        {
+          "key": "2.4.1",
+          "kind": "recommended",
+          "reason": "Índices hash usam hash tables"
+        }
+      ],
+      "checklist": [
+        "Projetei um índice composto adequado para uma consulta com filtro e ordenação",
+        "Expliquei por que WHERE lower(email) = ? não usa índice em email",
+        "Mostrei um index-only scan com EXPLAIN",
+        "Explico o custo de índices excessivos em uma tabela de escrita intensa"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar por que um índice (a, b) serve WHERE a = ? mas não WHERE b = ?"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Medir uma consulta em 1 milhão de linhas antes e depois de criar o índice"
+        },
+        {
+          "level": 2,
+          "type": "bug_hunt",
+          "title": "Descobrir por que uma consulta com função sobre a coluna ignora o índice e corrigi-la"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Medir o impacto de 0, 3 e 8 índices no throughput de INSERT"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Definir a estratégia de índices para as 5 consultas principais do schema do módulo"
+        }
+      ]
+    },
+    "3.4.7": {
+      "summary": "B+ Tree é a árvore balanceada de alto fan-out usada pela maioria dos índices, com chaves em nós internos e dados/ponteiros nas folhas encadeadas. Seu desenho minimiza leituras de páginas em disco e favorece range scans.",
+      "objectives": [
+        "Descrever a estrutura de nós internos e folhas encadeadas de uma B+ Tree",
+        "Explicar por que alto fan-out resulta em altura baixa e poucas leituras de página",
+        "Comparar B+ Tree com BST e hash para busca pontual e por intervalo",
+        "Explicar split de páginas e fragmentação",
+        "Calcular a altura aproximada de um índice dado tamanho de página e chave"
+      ],
+      "estimatedMinutes": 120,
+      "prerequisites": [
+        {
+          "key": "3.4.6",
+          "kind": "required",
+          "reason": "B+ Tree é a estrutura interna dos índices"
+        },
+        {
+          "key": "2.4.6",
+          "kind": "recommended",
+          "reason": "A B+ Tree generaliza árvores de busca"
+        },
+        {
+          "key": "1.2.8",
+          "kind": "recommended",
+          "reason": "Páginas de disco e memória explicam o desenho da estrutura"
+        }
+      ],
+      "checklist": [
+        "Calculo quantos níveis tem um índice de 100 milhões de chaves BIGINT em páginas de 8 KB",
+        "Explico por que bancos preferem B+ Tree a árvores binárias",
+        "Explico por que range scans são eficientes nas folhas encadeadas",
+        "Inspecionei a estrutura de um índice com pageinspect (bt_metap)"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar por que uma BST balanceada é ruim para disco e a B+ Tree não"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Calcular altura e número de leituras de página de um índice para tamanhos variados"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Usar pageinspect (bt_metap, bt_page_stats) para ver altura e níveis de um índice real"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Por que a B+ Tree guarda dados só nas folhas e as encadeia?"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar em Java uma B+ Tree em memória com inserção, busca e range scan"
+        }
+      ]
+    },
+    "3.4.8": {
+      "summary": "Query execution é como o banco processa um plano: parsing, reescrita, planejamento e execução por operadores (seq scan, index scan, bitmap scan, nested loop, hash join, merge join, sort) no modelo iterador e com buffer cache.",
+      "objectives": [
+        "Descrever as fases parse, rewrite, plan e execute",
+        "Explicar os métodos de acesso seq scan, index scan, index-only scan e bitmap scan",
+        "Comparar nested loop, hash join e merge join e quando cada um é eficiente",
+        "Explicar o papel do buffer cache (shared_buffers) e de work_mem em sorts e hashes"
+      ],
+      "estimatedMinutes": 90,
+      "prerequisites": [
+        {
+          "key": "3.4.3",
+          "kind": "recommended",
+          "reason": "Algoritmos de join executam os joins escritos em SQL"
+        },
+        {
+          "key": "3.4.7",
+          "kind": "recommended",
+          "reason": "Index scans percorrem a B+ Tree"
+        },
+        {
+          "key": "2.1.3",
+          "kind": "recommended",
+          "reason": "Comparar algoritmos de join exige análise de complexidade"
+        }
+      ],
+      "checklist": [
+        "Explico a complexidade de nested loop, hash join e merge join",
+        "Identifico um sort que vaza para disco por falta de work_mem",
+        "Explico por que um seq scan pode ser mais rápido que index scan"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Comparar nested loop, hash join e merge join em complexidade e uso de memória"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Forçar cada algoritmo de join com enable_* e comparar tempos"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Provocar um sort externo reduzindo work_mem e observar no EXPLAIN ANALYZE"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar hash join e nested loop join em Java sobre listas e comparar o desempenho"
+        }
+      ]
+    },
+    "3.4.9": {
+      "summary": "O query planner é o otimizador baseado em custo que escolhe o plano mais barato estimando cardinalidades a partir de estatísticas (pg_statistic, histogramas, n_distinct). Estimativas erradas levam a planos ruins.",
+      "objectives": [
+        "Explicar como o planner estima custo e seletividade",
+        "Entender o papel do ANALYZE e das estatísticas de colunas",
+        "Identificar planos ruins causados por estimativas incorretas",
+        "Usar estatísticas estendidas para colunas correlacionadas",
+        "Entender o impacto de prepared statements e planos genéricos versus customizados"
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        {
+          "key": "3.4.8",
+          "kind": "required",
+          "reason": "O planner escolhe entre os operadores de execução"
+        }
+      ],
+      "checklist": [
+        "Comparei linhas estimadas e reais e expliquei a diferença",
+        "Corrigi um plano ruim atualizando estatísticas ou criando estatísticas estendidas",
+        "Explico por que um prepared statement pode ficar lento após algumas execuções"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar como o planner estima linhas de WHERE status = 'X' usando histogramas e MCV"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Inserir dados em massa sem ANALYZE e comparar o plano antes e depois"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Corrigir estimativa errada em filtro com colunas correlacionadas (cidade e estado) com CREATE STATISTICS"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Por que uma query parametrizada rápida no psql fica lenta via JDBC?"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Criar um script que detecta divergências grandes entre linhas estimadas e reais em planos via EXPLAIN (FORMAT JSON)"
+        }
+      ]
+    },
+    "3.4.10": {
+      "summary": "EXPLAIN mostra o plano escolhido pelo planner e, com ANALYZE e BUFFERS, os tempos, linhas reais e páginas lidas de cada nó. É a principal ferramenta para diagnosticar consultas lentas.",
+      "objectives": [
+        "Ler um plano em árvore: custo inicial, custo total, rows e width",
+        "Usar EXPLAIN (ANALYZE, BUFFERS) e interpretar loops, tempos e hits/reads",
+        "Localizar o nó responsável pela maior parte do tempo",
+        "Usar pg_stat_statements para encontrar as consultas que mais consomem",
+        "Validar uma otimização comparando planos"
+      ],
+      "estimatedMinutes": 90,
+      "prerequisites": [
+        {
+          "key": "3.4.9",
+          "kind": "recommended",
+          "reason": "O EXPLAIN exibe as decisões do planner"
+        }
+      ],
+      "checklist": [
+        "Interpreto todos os campos de um EXPLAIN ANALYZE BUFFERS",
+        "Encontrei a query mais custosa com pg_stat_statements e a otimizei",
+        "Sei que EXPLAIN ANALYZE executa a consulta e cuido disso com DML"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar cada número de uma linha de nó do EXPLAIN (cost, rows, width, actual time, loops)"
+        },
+        {
+          "level": 2,
+          "type": "code_analysis",
+          "title": "Analisar 5 planos de execução reais e apontar o gargalo de cada um"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Otimizar uma consulta de 8 segundos até menos de 50ms usando apenas EXPLAIN como guia"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Habilitar pg_stat_statements, gerar carga e ranquear consultas por tempo total"
+        },
+        {
+          "level": 4,
+          "type": "project",
+          "title": "Relatório de tuning do schema do módulo com planos antes/depois e justificativas"
+        }
+      ]
+    },
+    "3.4.11": {
+      "summary": "Connection pool mantém conexões de banco abertas e reutilizáveis, evitando o custo de handshake e autenticação a cada requisição. Abrange dimensionamento, timeouts, vazamentos de conexão, HikariCP e poolers externos como PgBouncer.",
+      "objectives": [
+        "Explicar o custo de abrir uma conexão PostgreSQL (TCP, TLS, autenticação, processo backend)",
+        "Dimensionar o pool com base em núcleos, I/O e número de instâncias da aplicação",
+        "Configurar HikariCP (maximumPoolSize, connectionTimeout, maxLifetime, leakDetectionThreshold)",
+        "Diagnosticar esgotamento e vazamento de conexões",
+        "Comparar pool na aplicação com PgBouncer (modos session e transaction)"
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        {
+          "key": "3.1.4",
+          "kind": "recommended",
+          "reason": "Cada conexão de banco é uma conexão TCP"
+        },
+        {
+          "key": "3.1.11",
+          "kind": "recommended",
+          "reason": "Pool de banco aplica a mesma ideia de reutilização de conexões HTTP"
+        },
+        {
+          "key": "1.2.2",
+          "kind": "recommended",
+          "reason": "O PostgreSQL cria um processo por conexão"
+        }
+      ],
+      "checklist": [
+        "Medi o tempo de abrir uma conexão versus obter uma do pool",
+        "Detectei um vazamento de conexão com leakDetectionThreshold",
+        "Justifico um tamanho de pool para N instâncias e um limite max_connections",
+        "Explico por que um pool grande demais piora a latência"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Listar tudo que acontece ao abrir uma conexão PostgreSQL do zero"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Medir latência de 1000 consultas abrindo conexão a cada vez versus usando HikariCP"
+        },
+        {
+          "level": 2,
+          "type": "bug_hunt",
+          "title": "Encontrar o vazamento de conexão em um DAO que não fecha ResultSet/Connection em exceções"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Variar maximumPoolSize sob carga e plotar throughput e latência p99"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar um connection pool simples em Java com BlockingQueue, timeout e validação"
+        }
+      ]
+    },
+    "3.5.1": {
+      "summary": "Design de APIs REST: modelagem de recursos e URIs, escolha de métodos e status codes, formato de erros (RFC 9457), paginação, filtros, versionamento e evolução compatível do contrato. Aqui o foco é o contrato e sua segurança, complementando a visão de protocolo de 3.1.10.",
+      "objectives": [
+        "Modelar recursos e sub-recursos com URIs consistentes",
+        "Padronizar respostas de erro com Problem Details (RFC 9457)",
+        "Implementar paginação por offset e por cursor e explicar seus trade-offs",
+        "Definir estratégia de versionamento e mudanças compatíveis",
+        "Documentar o contrato com OpenAPI",
+        "Evitar exposição excessiva de dados (mass assignment, campos sensíveis)"
+      ],
+      "estimatedMinutes": 120,
+      "prerequisites": [
+        {
+          "key": "3.1.10",
+          "kind": "recommended",
+          "reason": "Revisita REST do ponto de vista de design, partindo das restrições do estilo"
+        },
+        {
+          "key": "3.1.8",
+          "kind": "required",
+          "reason": "O design de APIs REST depende da semântica do HTTP"
+        }
+      ],
+      "checklist": [
+        "Projetei a API de um domínio com recursos, status codes e erros padronizados",
+        "Implementei paginação por cursor e expliquei por que offset degrada em tabelas grandes",
+        "Listo mudanças de contrato compatíveis e incompatíveis",
+        "Escrevi a especificação OpenAPI da API"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Classificar mudanças de contrato como compatíveis ou incompatíveis"
+        },
+        {
+          "level": 2,
+          "type": "code_analysis",
+          "title": "Revisar uma API mal projetada e listar violações de semântica HTTP e consistência"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Implementar paginação por cursor (keyset) e comparar com OFFSET em 1 milhão de linhas"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Encontrar vulnerabilidade de mass assignment em um endpoint de atualização de usuário"
+        },
+        {
+          "level": 4,
+          "type": "project",
+          "title": "Projetar e documentar em OpenAPI a API de um sistema de pedidos com erros RFC 9457"
+        }
+      ]
+    },
+    "3.5.2": {
+      "summary": "Stateless significa que cada requisição carrega todo o contexto necessário, sem depender de estado mantido em memória no servidor entre requisições. Isso permite escala horizontal e balanceamento livre, deslocando o estado para cliente, banco ou cache.",
+      "objectives": [
+        "Explicar o que é estado de sessão e onde ele pode viver",
+        "Relacionar statelessness com escala horizontal e load balancing",
+        "Identificar estado oculto em memória (caches locais, sessões, uploads parciais)",
+        "Avaliar o custo de carregar contexto em cada requisição"
+      ],
+      "estimatedMinutes": 40,
+      "prerequisites": [
+        {
+          "key": "3.5.1",
+          "kind": "recommended",
+          "reason": "Statelessness é uma restrição central do design REST"
+        }
+      ],
+      "checklist": [
+        "Identifiquei estado em memória que quebra com duas instâncias atrás de um balanceador",
+        "Explico por que sticky sessions são um paliativo e não solução",
+        "Descrevo alternativas para externalizar o estado"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar por que estado em memória impede escalar horizontalmente"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Rodar duas instâncias de um app com sessão em memória atrás do nginx e observar o problema"
+        },
+        {
+          "level": 3,
+          "type": "code_analysis",
+          "title": "Encontrar estado oculto em um serviço (mapa estático, cache local, contador)"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Sticky sessions resolvem o problema de estado? Quais os riscos?"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Refatorar um serviço com sessão em memória para estado externo e validar com três instâncias balanceadas"
+        }
+      ]
+    },
+    "3.5.3": {
+      "summary": "Autenticação verifica a identidade de quem faz a requisição: credenciais, fatores múltiplos, tokens, API keys e delegação via OAuth 2.0/OpenID Connect. Inclui ataques comuns como brute force e credential stuffing.",
+      "objectives": [
+        "Diferenciar autenticação de autorização",
+        "Comparar Basic, API keys, sessões e tokens bearer",
+        "Explicar o fluxo Authorization Code com PKCE do OAuth 2.0 e o papel do OpenID Connect",
+        "Proteger login contra brute force e enumeração de usuários",
+        "Entender MFA e por que reduz risco"
+      ],
+      "estimatedMinutes": 90,
+      "prerequisites": [
+        {
+          "key": "3.1.9",
+          "kind": "required",
+          "reason": "Credenciais só podem trafegar com segurança sobre HTTPS"
+        },
+        {
+          "key": "3.5.2",
+          "kind": "recommended",
+          "reason": "O modelo stateless influencia como a identidade é transportada"
+        }
+      ],
+      "checklist": [
+        "Desenho o fluxo Authorization Code + PKCE de memória",
+        "Implementei login com rate limiting e mensagens que não revelam se o usuário existe",
+        "Explico a diferença entre OAuth 2.0 e OpenID Connect"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar por que OAuth 2.0 é delegação de autorização e não protocolo de autenticação"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Executar o fluxo Authorization Code + PKCE manualmente com curl contra um Keycloak local"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Encontrar a enumeração de usuários em um endpoint de login e recuperação de senha"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Como você protegeria um endpoint de login contra credential stuffing?"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar autenticação por API key com hash armazenado e rotação"
+        }
+      ]
+    },
+    "3.5.4": {
+      "summary": "Autorização decide o que uma identidade autenticada pode fazer, com modelos como RBAC, ABAC e verificações de propriedade do recurso. Inclui falhas como IDOR/BOLA, a principal vulnerabilidade de APIs.",
+      "objectives": [
+        "Comparar RBAC, ABAC e controle por propriedade do recurso",
+        "Identificar e corrigir IDOR/BOLA",
+        "Aplicar o princípio do menor privilégio e negar por padrão",
+        "Centralizar regras de autorização em vez de espalhá-las",
+        "Escopar consultas ao tenant/usuário no nível do banco"
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        {
+          "key": "3.5.3",
+          "kind": "required",
+          "reason": "Autorização opera sobre uma identidade já autenticada"
+        }
+      ],
+      "checklist": [
+        "Explorei e corrigi um IDOR em um endpoint GET /pedidos/{id}",
+        "Modelei papéis e permissões para um sistema multi-tenant",
+        "Escrevi testes que verificam acesso negado para usuários sem permissão"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Diferenciar 401 e 403 e quando cada um deve ser retornado"
+        },
+        {
+          "level": 2,
+          "type": "bug_hunt",
+          "title": "Explorar e corrigir um IDOR que permite ler pedidos de outros usuários"
+        },
+        {
+          "level": 3,
+          "type": "code_analysis",
+          "title": "Revisar uma API multi-tenant e encontrar consultas não escopadas por tenant"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "RBAC ou ABAC para um sistema de documentos com compartilhamento? Justifique"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar um mecanismo de autorização por permissões com testes de acesso negado"
+        }
+      ]
+    },
+    "3.5.5": {
+      "summary": "Sessões mantêm o estado de autenticação no servidor, identificado por um session ID opaco enviado ao cliente. Abrange armazenamento (memória, Redis, banco), expiração, regeneração de ID e ataques como session fixation e hijacking.",
+      "objectives": [
+        "Explicar o fluxo de login baseado em sessão",
+        "Gerar session IDs com entropia suficiente e regenerá-los no login",
+        "Escolher armazenamento compartilhado para múltiplas instâncias",
+        "Implementar expiração por inatividade e absoluta, além de logout real",
+        "Explicar session fixation e session hijacking"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "3.5.3",
+          "kind": "required",
+          "reason": "Sessões são um mecanismo de manter a autenticação"
+        },
+        {
+          "key": "3.5.2",
+          "kind": "recommended",
+          "reason": "Sessões introduzem estado no servidor que precisa ser externalizado"
+        }
+      ],
+      "checklist": [
+        "Implementei sessões armazenadas fora da instância e funcionando com duas réplicas",
+        "Explico e previno session fixation",
+        "Implementei revogação imediata de sessão no logout"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar por que o ID de sessão deve ser regenerado após o login"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Implementar sessões em Redis com expiração por inatividade em uma aplicação Java"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Demonstrar session fixation em uma aplicação que reutiliza o ID pré-login"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Sessões ou JWT para uma aplicação web tradicional? Defenda sua escolha"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar login por sessão com regeneração de ID, expiração e logout de todas as sessões do usuário"
+        }
+      ]
+    },
+    "3.5.6": {
+      "summary": "Cookies são pares chave-valor que o navegador armazena e envia automaticamente por domínio e caminho. Atributos como HttpOnly, Secure, SameSite, Domain e Max-Age determinam sua segurança frente a XSS e CSRF.",
+      "objectives": [
+        "Explicar como Set-Cookie e o envio automático pelo navegador funcionam",
+        "Configurar HttpOnly, Secure, SameSite, Domain, Path e expiração",
+        "Explicar CSRF e como SameSite e tokens anti-CSRF o mitigam",
+        "Explicar por que cookies HttpOnly reduzem o impacto de XSS",
+        "Diferenciar cookies first-party e third-party"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "3.1.8",
+          "kind": "required",
+          "reason": "Cookies são transportados por headers HTTP"
+        },
+        {
+          "key": "3.5.5",
+          "kind": "recommended",
+          "reason": "Cookies são o transporte usual de session IDs"
+        }
+      ],
+      "checklist": [
+        "Configurei um cookie de sessão com atributos seguros e verifiquei no DevTools",
+        "Demonstrei um ataque CSRF e o bloqueei com SameSite",
+        "Explico a diferença entre SameSite=Lax, Strict e None"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar o que cada atributo de cookie protege e contra qual ataque"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Inspecionar Set-Cookie e envio automático com curl e DevTools"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Montar uma página maliciosa que executa CSRF e bloqueá-la com SameSite=Lax"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Guardar token em localStorage ou em cookie HttpOnly? Trade-offs de XSS e CSRF"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar proteção CSRF com double-submit token além de SameSite em uma API Java"
+        }
+      ]
+    },
+    "3.5.7": {
+      "summary": "JWT é um token compacto com header, payload e assinatura (HMAC ou assimétrica), permitindo validação sem consulta ao servidor. Assinatura garante integridade, não confidencialidade; envolve claims, expiração, refresh tokens, revogação e ataques como alg=none.",
+      "objectives": [
+        "Decodificar um JWT e explicar header, payload, assinatura e claims (exp, iat, iss, aud, sub)",
+        "Diferenciar assinatura (JWS) de criptografia (JWE)",
+        "Comparar HS256 e RS256/ES256 e o uso de JWKS",
+        "Projetar estratégia de access token curto, refresh token e revogação",
+        "Identificar vulnerabilidades: alg=none, confusão de algoritmo, segredo fraco, falta de validação de aud"
+      ],
+      "estimatedMinutes": 90,
+      "prerequisites": [
+        {
+          "key": "3.5.3",
+          "kind": "required",
+          "reason": "JWT é um mecanismo de transporte de identidade autenticada"
+        },
+        {
+          "key": "3.5.5",
+          "kind": "recommended",
+          "reason": "Comparar com sessões evidencia o problema de revogação"
+        },
+        {
+          "key": "3.1.7",
+          "kind": "recommended",
+          "reason": "Assinaturas assimétricas e chaves públicas aparecem também no TLS"
+        }
+      ],
+      "checklist": [
+        "Decodifiquei um JWT manualmente e verifiquei sua assinatura em código",
+        "Explico por que dados sensíveis não devem ir no payload de um JWS",
+        "Projetei revogação de tokens (expiração curta, denylist ou rotação de refresh)",
+        "Testei a rejeição de tokens com alg=none, expirados e com audience errada"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar por que um JWT assinado pode ser lido por qualquer um mas não alterado"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Gerar e validar JWT em Java com RS256, verificando exp, iss e aud"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Explorar um validador que aceita alg=none ou confunde RS256 com HS256"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Como revogar um JWT antes da expiração sem perder a vantagem stateless?"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar fluxo de access + refresh token com rotação e detecção de reuso"
+        }
+      ]
+    },
+    "3.5.8": {
+      "summary": "Password hashing armazena senhas como derivações unidirecionais lentas e com custo ajustável (bcrypt, scrypt, Argon2id, PBKDF2), tornando ataques offline caros. Hashes rápidos como SHA-256 são inadequados para senhas.",
+      "objectives": [
+        "Diferenciar hash criptográfico rápido de função de derivação de senha",
+        "Explicar por que lentidão e consumo de memória dificultam ataques com GPU",
+        "Configurar bcrypt/Argon2id com fator de custo adequado",
+        "Implementar rehash transparente ao aumentar o custo",
+        "Comparar hashes em tempo constante"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "2.4.1",
+          "kind": "recommended",
+          "reason": "Contrasta funções hash de estruturas de dados com hashes criptográficos"
+        },
+        {
+          "key": "3.5.3",
+          "kind": "recommended",
+          "reason": "Senhas são a credencial mais comum de autenticação"
+        }
+      ],
+      "checklist": [
+        "Explico por que SHA-256 de senha é inseguro mesmo com salt",
+        "Escolhi um fator de custo medindo o tempo de hash no servidor",
+        "Implementei migração de hashes legados no login"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar por que funções lentas são desejáveis para senhas e indesejáveis para checksums"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Medir hashes por segundo de SHA-256 versus bcrypt (custo 10, 12, 14) em Java"
+        },
+        {
+          "level": 3,
+          "type": "code_analysis",
+          "title": "Revisar um cadastro que usa MD5 e propor migração sem forçar reset de senhas"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar verificação com Argon2id e rehash automático quando o custo configurado aumenta"
+        }
+      ]
+    },
+    "3.5.9": {
+      "summary": "Salt é um valor aleatório único por senha combinado antes do hash, impedindo rainbow tables e que senhas iguais gerem hashes iguais. Pepper é um segredo adicional mantido fora do banco.",
+      "objectives": [
+        "Explicar como o salt anula rainbow tables e ataques em lote",
+        "Gerar salts com SecureRandom e tamanho adequado",
+        "Explicar onde o salt é armazenado em formatos como o do bcrypt",
+        "Diferenciar salt de pepper e avaliar o uso de pepper"
+      ],
+      "estimatedMinutes": 30,
+      "prerequisites": [
+        {
+          "key": "3.5.8",
+          "kind": "required",
+          "reason": "Salt é um componente do hashing de senhas"
+        }
+      ],
+      "checklist": [
+        "Explico por que o salt não precisa ser secreto",
+        "Identifiquei salt, custo e hash numa string bcrypt",
+        "Explico a diferença entre salt e pepper"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar por que o salt pode ficar armazenado junto ao hash"
+        },
+        {
+          "level": 2,
+          "type": "code_analysis",
+          "title": "Decompor uma string bcrypt ($2b$12$...) em versão, custo, salt e hash"
+        },
+        {
+          "level": 2,
+          "type": "bug_hunt",
+          "title": "Encontrar o problema de um sistema que usa um salt fixo global para todas as senhas"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Vale a pena usar pepper? Onde guardá-lo e como rotacioná-lo?"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar hashing PBKDF2 manual com salt por usuário e pepper vindo de variável de ambiente"
+        }
+      ]
+    },
+    "3.5.10": {
+      "summary": "CORS é o mecanismo pelo qual o servidor relaxa a same-origin policy do navegador, informando via headers quais origens, métodos e headers podem acessar respostas. Inclui requisições simples, preflight OPTIONS e credenciais.",
+      "objectives": [
+        "Explicar a same-origin policy e o que conta como origem",
+        "Diferenciar requisições simples e com preflight",
+        "Configurar Access-Control-Allow-Origin, -Methods, -Headers e -Credentials corretamente",
+        "Explicar por que CORS não é mecanismo de autenticação nem protege o servidor de clientes não navegadores",
+        "Identificar configurações perigosas (refletir qualquer Origin com credenciais)"
+      ],
+      "estimatedMinutes": 50,
+      "prerequisites": [
+        {
+          "key": "3.1.8",
+          "kind": "required",
+          "reason": "CORS é implementado com headers HTTP"
+        },
+        {
+          "key": "3.5.6",
+          "kind": "recommended",
+          "reason": "O envio de credenciais cross-origin envolve cookies"
+        }
+      ],
+      "checklist": [
+        "Reproduzi e corrigi um erro de CORS com preflight",
+        "Explico por que curl ignora CORS",
+        "Identifico uma configuração CORS insegura"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar por que CORS é aplicado pelo navegador e não pelo servidor"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Provocar um preflight com header customizado e inspecionar a requisição OPTIONS no DevTools"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Encontrar a falha de uma API que reflete qualquer Origin com Allow-Credentials: true"
+        },
+        {
+          "level": 3,
+          "type": "coding",
+          "title": "Configurar CORS restrito por lista de origens em uma API Java"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar um filtro CORS próprio em Java que trata preflight, allowlist de origens e Vary: Origin"
+        }
+      ]
+    },
+    "3.5.11": {
+      "summary": "Idempotência garante que repetir uma operação produz o mesmo efeito que executá-la uma vez, essencial diante de retries e timeouts. Abrange métodos idempotentes do HTTP e idempotency keys armazenadas para operações como pagamentos.",
+      "objectives": [
+        "Explicar por que timeouts tornam o resultado de uma requisição desconhecido",
+        "Identificar métodos HTTP idempotentes por especificação",
+        "Implementar idempotency keys com armazenamento e constraint única",
+        "Tratar requisições concorrentes com a mesma chave",
+        "Definir retenção e escopo das chaves"
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        {
+          "key": "3.1.8",
+          "kind": "recommended",
+          "reason": "A semântica de idempotência dos métodos vem do HTTP"
+        },
+        {
+          "key": "3.2.1",
+          "kind": "recommended",
+          "reason": "Registrar a chave e o efeito exige atomicidade"
+        },
+        {
+          "key": "3.4.4",
+          "kind": "recommended",
+          "reason": "A deduplicação se apoia em constraints de unicidade"
+        }
+      ],
+      "checklist": [
+        "Implementei um endpoint de pagamento com Idempotency-Key que não duplica cobranças",
+        "Testei requisições concorrentes com a mesma chave",
+        "Explico por que POST não é idempotente e como torná-lo"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar o cenário de timeout em que o cliente não sabe se o pagamento ocorreu"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Implementar Idempotency-Key em um POST /pagamentos com tabela e constraint única"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Encontrar a condição de corrida em uma implementação de idempotência do tipo check-then-insert"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Como a Stripe implementa idempotency keys e o que acontece com o mesmo key e payload diferente?"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Criar um teste de carga que dispara retries concorrentes e prova ausência de cobranças duplicadas"
+        }
+      ]
+    },
+    "3.5.12": {
+      "summary": "SQL injection ocorre quando entrada do usuário é concatenada em SQL e interpretada como código. A defesa principal são prepared statements com parâmetros vinculados, complementados por menor privilégio e cuidado com partes dinâmicas como ORDER BY.",
+      "objectives": [
+        "Explicar como a concatenação permite alterar a estrutura de uma consulta",
+        "Explorar SQL injection clássica, baseada em UNION e blind em ambiente controlado",
+        "Usar PreparedStatement corretamente e entender por que ele separa código de dados",
+        "Tratar identificadores dinâmicos (colunas de ordenação) com allowlist",
+        "Aplicar menor privilégio ao usuário de banco da aplicação"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "3.4.2",
+          "kind": "required",
+          "reason": "É preciso entender SQL para entender como a injeção altera a consulta"
+        }
+      ],
+      "checklist": [
+        "Explorei uma SQL injection em uma aplicação vulnerável local",
+        "Corrigi a vulnerabilidade com PreparedStatement e expliquei por que funciona",
+        "Protegi um ORDER BY dinâmico com allowlist",
+        "Explico por que escapar strings manualmente não é a defesa adequada"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar por que parâmetros vinculados não podem ser interpretados como SQL"
+        },
+        {
+          "level": 2,
+          "type": "bug_hunt",
+          "title": "Explorar um login vulnerável com ' OR '1'='1 e corrigi-lo com PreparedStatement"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Extrair dados de outra tabela via UNION injection em uma aplicação local vulnerável"
+        },
+        {
+          "level": 3,
+          "type": "code_analysis",
+          "title": "Revisar um DAO e encontrar injeções em ORDER BY, LIKE e IN dinâmicos"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar um construtor de filtros dinâmicos seguro com allowlist de colunas e parâmetros"
+        }
+      ]
+    }
+  }
+}

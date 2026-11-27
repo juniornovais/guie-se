@@ -1,0 +1,1017 @@
+{
+  "stage": "06",
+  "modules": {
+    "6.1": {
+      "description": "Estabelece o método de uma entrevista de System Design: levantar requisitos funcionais e não funcionais, estimar capacidade com números de ordem de grandeza, definir API e modelo de dados e chegar a uma arquitetura de alto nível. Em seguida cobre os blocos de construção usados em praticamente todo desenho escalável — escala horizontal, load balancer, cache e CDN — sempre com foco em quando usar cada um e qual custo cada escolha traz.",
+      "objectives": [
+        "Conduzir uma entrevista de System Design em etapas com gestão explícita do tempo de 45 minutos",
+        "Transformar um enunciado vago em requisitos funcionais e não funcionais priorizados e mensuráveis",
+        "Estimar QPS, armazenamento e banda com back-of-the-envelope e usar os números para justificar decisões",
+        "Definir API e modelo de dados coerentes com os padrões de acesso do sistema",
+        "Desenhar uma arquitetura de alto nível com load balancer, serviços stateless, cache e CDN",
+        "Justificar cada componente adicionado por um requisito ou por um gargalo identificado"
+      ]
+    },
+    "6.2": {
+      "description": "Primeira bateria de problemas clássicos, de complexidade crescente: URL Shortener, Rate Limiter, Distributed Message Queue e Notification/Webhook System. Cada problema é resolvido de ponta a ponta com o método do módulo 6.1 — requisitos, estimativas, API, modelo de dados, arquitetura e deep dives — e inclui a implementação em Java de um componente central para conectar o desenho ao código.",
+      "objectives": [
+        "Resolver problemas clássicos de ponta a ponta dentro de 45 minutos seguindo um roteiro consistente",
+        "Escolher estratégias de geração de IDs, algoritmos de rate limiting e semânticas de entrega justificando os trade-offs",
+        "Aplicar Redis, filas e logs particionados como blocos de construção em desenhos concretos",
+        "Projetar entrega confiável com retries, backoff, idempotência e dead letter queue",
+        "Implementar em Java um componente central de cada problema com testes",
+        "Identificar gargalos de cada desenho e propor como evoluí-lo com 10x de carga"
+      ]
+    },
+    "6.3": {
+      "description": "Aprofunda as decisões de dados e confiabilidade que diferenciam um desenho mediano de um bom: replicação, particionamento, sharding, caching, filas, consistência, disponibilidade, CAP, hotspots, pontos únicos de falha e tolerância a falhas. Vários temas já apareceram nas etapas 03 e 05; aqui o foco é a ótica de design — como escolher, quantificar e defender cada trade-off diante de requisitos concretos numa entrevista ou num projeto real.",
+      "objectives": [
+        "Escolher topologias de replicação e estratégias de particionamento a partir dos padrões de acesso e dos requisitos de consistência",
+        "Projetar sharding com chave adequada, rebalanceamento e tratamento de hotspots",
+        "Posicionar caches e filas na arquitetura e explicar seus modos de falha",
+        "Argumentar com CAP e PACELC sobre consistência versus disponibilidade e latência por caso de uso",
+        "Calcular disponibilidade composta e eliminar pontos únicos de falha",
+        "Projetar degradação graciosa e tolerância a falhas mensurável contra SLOs"
+      ]
+    },
+    "6.4": {
+      "description": "Segunda bateria de problemas, mais abertos e com maior exigência de deep dive: feed social, chat em tempo real, armazenamento distribuído e sistema de pagamentos. O módulo fecha com as habilidades transversais de uma entrevista de nível sênior — mock interviews cronometradas, explicação clara de trade-offs, identificação de gargalos e evolução da arquitetura conforme a escala cresce de milhares para centenas de milhões de usuários.",
+      "objectives": [
+        "Resolver problemas abertos de grande escala com deep dives justificados por números",
+        "Projetar fan-out, entrega em tempo real, replicação por quorum e consistência financeira em contextos concretos",
+        "Garantir correção em pagamentos com idempotency keys, ledger de dupla entrada e reconciliação",
+        "Conduzir e avaliar mock interviews cronometradas com rubrica explícita",
+        "Comunicar trade-offs de forma estruturada: opções, critério, decisão e custo aceito",
+        "Diagnosticar gargalos e planejar a evolução incremental de uma arquitetura por ordem de grandeza"
+      ]
+    }
+  },
+  "topics": {
+    "6.1.1": {
+      "summary": "Roteiro para conduzir uma entrevista de System Design: esclarecer escopo, estimar, propor API e dados, desenhar alto nível, aprofundar componentes críticos e fechar com trade-offs, tudo dentro de ~45 minutos e com comunicação contínua.",
+      "objectives": [
+        "Descrever as fases da entrevista (requisitos, estimativas, API, dados, alto nível, deep dive, wrap-up) e o tempo-alvo de cada uma",
+        "Fazer perguntas de esclarecimento que reduzam o escopo a um MVP defensável",
+        "Narrar o raciocínio em voz alta e confirmar suposições com o entrevistador antes de avançar",
+        "Reconhecer sinais do entrevistador para mudar de profundidade ou de componente",
+        "Listar os erros mais comuns: pular requisitos, desenhar cedo demais, ignorar números e não discutir trade-offs"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [],
+      "checklist": [
+        "Consigo escrever de memória o roteiro de fases com o orçamento de minutos de cada uma",
+        "Conduzi ao menos uma simulação curta respeitando o tempo de cada fase",
+        "Sei listar 5 perguntas de esclarecimento genéricas que se aplicam a quase qualquer problema",
+        "Identifico numa gravação ou transcrição onde o candidato perdeu tempo ou deixou de justificar uma decisão"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Montar o roteiro de 45 minutos com orçamento de tempo por fase" },
+        { "level": 2, "type": "interview", "title": "Primeiros 8 minutos: esclarecer escopo de \"desenhe o YouTube\" e fechar o MVP" },
+        { "level": 2, "type": "code_analysis", "title": "Analisar a transcrição de uma entrevista e apontar os 5 erros de condução" },
+        { "level": 3, "type": "experiment", "title": "Gravar uma simulação de 20 minutos e medir o tempo gasto em cada fase" },
+        { "level": 4, "type": "project", "title": "Criar um template pessoal de quadro (whiteboard) reutilizável para entrevistas" }
+      ]
+    },
+    "6.1.2": {
+      "summary": "Requisitos funcionais definem o que o sistema faz: casos de uso, atores e operações principais. Delimitá-los cedo e priorizá-los evita desenhar funcionalidades que não serão avaliadas.",
+      "objectives": [
+        "Extrair casos de uso centrais a partir de um enunciado ambíguo",
+        "Separar funcionalidades core, desejáveis e fora de escopo de forma explícita",
+        "Expressar requisitos como operações verificáveis (ex.: \"usuário cria URL curta com alias opcional\")",
+        "Identificar atores e padrões de interação (leitura vs escrita, síncrono vs assíncrono)",
+        "Relacionar cada requisito funcional a pelo menos um endpoint ou fluxo da arquitetura"
+      ],
+      "estimatedMinutes": 45,
+      "prerequisites": [
+        { "key": "6.1.1", "kind": "recommended", "reason": "Requisitos são a primeira fase do roteiro da entrevista" }
+      ],
+      "checklist": [
+        "Para um enunciado novo, produzo em até 5 minutos uma lista de 3–5 requisitos core e itens fora de escopo",
+        "Cada requisito que escrevo é verificável e não ambíguo",
+        "Consigo justificar por que deixei uma funcionalidade fora do escopo"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Classificar 15 requisitos de um app de delivery em core, desejável e fora de escopo" },
+        { "level": 2, "type": "interview", "title": "Levantar requisitos funcionais do Instagram em 5 minutos" },
+        { "level": 2, "type": "bug_hunt", "title": "Encontrar requisitos ambíguos ou não verificáveis numa especificação de chat" },
+        { "level": 3, "type": "conceptual", "title": "Mapear requisitos funcionais do Uber para fluxos de leitura e escrita" },
+        { "level": 4, "type": "project", "title": "Escrever a especificação funcional de um sistema de reservas de ingressos" }
+      ]
+    },
+    "6.1.3": {
+      "summary": "Requisitos não funcionais — escala, latência, disponibilidade, consistência, durabilidade, segurança — definem como o sistema deve se comportar e são os que mais influenciam a arquitetura.",
+      "objectives": [
+        "Quantificar requisitos não funcionais (ex.: p99 < 200 ms, 99,95% de disponibilidade, RPO de 0)",
+        "Converter percentuais de disponibilidade em downtime permitido por mês e por ano",
+        "Decidir entre consistência forte e eventual por funcionalidade, não pelo sistema inteiro",
+        "Identificar requisitos não funcionais conflitantes e explicitar qual priorizar",
+        "Relacionar cada requisito não funcional a decisões de arquitetura concretas"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        { "key": "6.1.2", "kind": "recommended", "reason": "Requisitos não funcionais qualificam os casos de uso já definidos" },
+        { "key": "3.3.6", "kind": "recommended", "reason": "SLI/SLO fornecem a linguagem para quantificar latência e disponibilidade" },
+        { "key": "5.3.3", "kind": "recommended", "reason": "Necessário para decidir onde consistência eventual é aceitável" }
+      ],
+      "checklist": [
+        "Converto 99,9%, 99,95% e 99,99% em minutos de downtime por mês sem consultar",
+        "Para um sistema dado, escrevo NFRs com números e unidade, nunca adjetivos vagos",
+        "Explico como um NFR específico mudou uma decisão de arquitetura"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Tabela de \"noves\": converter disponibilidade em downtime mensal e anual" },
+        { "level": 2, "type": "interview", "title": "Definir NFRs quantificados para um sistema de pagamentos e para um feed social" },
+        { "level": 3, "type": "conceptual", "title": "Resolver conflito entre latência p99 baixa e consistência forte em leitura de saldo" },
+        { "level": 3, "type": "code_analysis", "title": "Avaliar uma especificação com NFRs vagos e reescrevê-los com métricas" },
+        { "level": 4, "type": "project", "title": "Documento de NFRs com SLOs, orçamento de erro e impacto arquitetural para um e-commerce" }
+      ]
+    },
+    "6.1.4": {
+      "summary": "Capacity estimation (back-of-the-envelope) usa ordens de grandeza para estimar QPS médio e de pico, armazenamento, banda e memória de cache, transformando requisitos em números que justificam a arquitetura.",
+      "objectives": [
+        "Calcular QPS médio e de pico a partir de DAU e ações por usuário (1 dia ≈ 10^5 s)",
+        "Estimar armazenamento em 5 anos considerando tamanho de registro, replicação e índices",
+        "Estimar banda de entrada e saída e memória de cache pela regra 80/20",
+        "Usar latency numbers (memória, SSD, rede intra e inter-datacenter) para avaliar viabilidade",
+        "Decidir com base nos números se o sistema é read-heavy, write-heavy ou precisa de sharding"
+      ],
+      "estimatedMinutes": 90,
+      "prerequisites": [
+        { "key": "6.1.3", "kind": "recommended", "reason": "As estimativas partem dos requisitos de escala definidos como NFRs" }
+      ],
+      "checklist": [
+        "Faço a estimativa completa (QPS, storage, banda, cache) de um problema novo em menos de 5 minutos",
+        "Sei de memória potências de 2 e 10 úteis e latency numbers principais",
+        "Explico qual decisão de arquitetura cada número da estimativa sustentou",
+        "Meus resultados ficam na ordem de grandeza correta quando comparados a uma referência"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Memorizar latency numbers e potências de 2 com flashcards de ordem de grandeza" },
+        { "level": 2, "type": "interview", "title": "Estimar QPS, armazenamento em 5 anos e banda do Twitter com 300M DAU" },
+        { "level": 2, "type": "bug_hunt", "title": "Encontrar os erros de unidade e ordem de grandeza numa estimativa pronta" },
+        { "level": 3, "type": "conceptual", "title": "Dimensionar o cluster de cache para servir 80% das leituras de um URL Shortener" },
+        { "level": 4, "type": "coding", "title": "Implementar em Java uma calculadora de capacidade parametrizável (DAU, ações, payload, retenção)" }
+      ]
+    },
+    "6.1.5": {
+      "summary": "API design define o contrato entre clientes e sistema: recursos, verbos, payloads, paginação, versionamento e idempotência, escolhidos de acordo com os casos de uso e o perfil de tráfego.",
+      "objectives": [
+        "Derivar endpoints REST diretamente dos requisitos funcionais",
+        "Escolher paginação por cursor versus offset justificando consistência e desempenho",
+        "Projetar operações de escrita idempotentes com Idempotency-Key quando há retries",
+        "Comparar REST, gRPC, GraphQL e WebSocket por caso de uso",
+        "Definir códigos de status, erros e versionamento de forma consistente"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        { "key": "3.5.1", "kind": "recommended", "reason": "Base de design REST aplicada aqui no contexto de entrevista" },
+        { "key": "3.5.11", "kind": "recommended", "reason": "Idempotência é decisiva em APIs de escrita sujeitas a retry" },
+        { "key": "6.1.2", "kind": "recommended", "reason": "A API é derivada dos requisitos funcionais" }
+      ],
+      "checklist": [
+        "Para um problema novo, escrevo 3–6 endpoints com método, path, payload e resposta",
+        "Justifico a escolha de paginação e de protocolo para cada caso de uso",
+        "Explico como minha API se comporta diante de um retry de cliente"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Comparar paginação offset e cursor em um feed com inserções frequentes" },
+        { "level": 2, "type": "interview", "title": "Desenhar a API de um sistema de reservas de hotel em 7 minutos" },
+        { "level": 2, "type": "bug_hunt", "title": "Encontrar falhas de idempotência e de semântica HTTP numa API de pagamentos" },
+        { "level": 3, "type": "conceptual", "title": "Escolher entre REST, gRPC e WebSocket para cliente móvel, serviço interno e chat" },
+        { "level": 4, "type": "implementation", "title": "Implementar em Spring um endpoint POST idempotente com Idempotency-Key e paginação por cursor" }
+      ]
+    },
+    "6.1.6": {
+      "summary": "O modelo de dados define entidades, relacionamentos, chaves e índices a partir dos padrões de acesso, e orienta a escolha entre bancos relacionais, key-value, wide-column ou documentos.",
+      "objectives": [
+        "Modelar entidades e chaves a partir das queries mais frequentes (access-pattern-first)",
+        "Escolher entre SQL e NoSQL justificando consistência, joins, escala de escrita e flexibilidade",
+        "Definir índices e chaves de partição que suportem as queries críticas",
+        "Avaliar quando desnormalizar para reduzir latência de leitura",
+        "Estimar o tamanho de um registro e conectar ao cálculo de armazenamento"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        { "key": "3.4.6", "kind": "recommended", "reason": "Índices determinam se o modelo suporta as queries críticas" },
+        { "key": "6.1.4", "kind": "recommended", "reason": "O tamanho dos registros alimenta a estimativa de armazenamento" },
+        { "key": "6.1.5", "kind": "recommended", "reason": "Os endpoints revelam os padrões de acesso a modelar" }
+      ],
+      "checklist": [
+        "Para um problema novo, listo as queries críticas antes de desenhar tabelas",
+        "Justifico a escolha do tipo de banco com pelo menos dois critérios técnicos",
+        "Defino a chave de partição e os índices que atendem cada query crítica"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Relacionar 6 padrões de acesso ao tipo de banco mais adequado" },
+        { "level": 2, "type": "interview", "title": "Modelar os dados de um sistema de chat: mensagens, conversas e participantes" },
+        { "level": 3, "type": "code_analysis", "title": "Avaliar um schema relacional normalizado e propor desnormalização para leitura de feed" },
+        { "level": 3, "type": "bug_hunt", "title": "Encontrar a query sem índice e a chave de partição ruim num modelo de e-commerce" },
+        { "level": 4, "type": "implementation", "title": "Implementar e comparar no PostgreSQL dois modelos para timeline com EXPLAIN ANALYZE" }
+      ]
+    },
+    "6.1.7": {
+      "summary": "A arquitetura de alto nível conecta clientes, entrada (DNS, CDN, load balancer, API gateway), serviços, armazenamento, cache e processamento assíncrono num diagrama que atende os requisitos e serve de base para os deep dives.",
+      "objectives": [
+        "Desenhar um diagrama de alto nível com fluxo de leitura e de escrita claramente separados",
+        "Posicionar API gateway, load balancer, serviços stateless, banco, cache e filas com justificativa",
+        "Percorrer uma requisição de ponta a ponta explicando cada salto",
+        "Decidir o que é síncrono e o que é assíncrono no fluxo principal",
+        "Apontar no diagrama os componentes candidatos a deep dive"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        { "key": "6.1.6", "kind": "recommended", "reason": "A arquitetura organiza os componentes em torno do modelo de dados" },
+        { "key": "5.1.2", "kind": "recommended", "reason": "Filas são o principal mecanismo para tirar trabalho do caminho síncrono" }
+      ],
+      "checklist": [
+        "Desenho em 10 minutos um diagrama de alto nível que atende todos os requisitos core",
+        "Explico o caminho de uma requisição de leitura e de uma de escrita sem lacunas",
+        "Cada componente do diagrama tem uma justificativa associada a requisito ou número"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar o papel de cada caixa num diagrama de referência de aplicação web" },
+        { "level": 2, "type": "interview", "title": "Desenhar o alto nível do Dropbox separando metadados e blocos de arquivo" },
+        { "level": 2, "type": "bug_hunt", "title": "Encontrar o ponto único de falha e a dependência síncrona desnecessária num diagrama" },
+        { "level": 3, "type": "conceptual", "title": "Decidir o que mover para processamento assíncrono no checkout de um e-commerce" },
+        { "level": 4, "type": "project", "title": "Documentar a arquitetura de alto nível de um projeto próprio no modelo C4 (níveis 1 e 2)" }
+      ]
+    },
+    "6.1.8": {
+      "summary": "Horizontal scaling adiciona instâncias em vez de máquinas maiores; exige serviços stateless, externalização de sessão e estado, e traz custos de coordenação e consistência.",
+      "objectives": [
+        "Comparar vertical e horizontal scaling por custo, limite físico e disponibilidade",
+        "Tornar um serviço stateless movendo sessão e estado para armazenamento externo",
+        "Calcular o número de instâncias necessárias a partir do QPS de pico e da capacidade por instância",
+        "Explicar como autoscaling reage a métricas e os riscos de oscilação e cold start",
+        "Identificar o que não escala horizontalmente com facilidade (banco primário, locks, estado local)"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        { "key": "6.1.7", "kind": "recommended", "reason": "Escalar horizontalmente pressupõe uma arquitetura com camadas bem definidas" },
+        { "key": "6.1.4", "kind": "recommended", "reason": "O dimensionamento de instâncias parte do QPS estimado" }
+      ],
+      "checklist": [
+        "Calculo quantas instâncias atendem um pico dado com margem de segurança",
+        "Explico como externalizar sessão e por que estado local impede escalar",
+        "Aponto o próximo gargalo quando a camada de aplicação já escala horizontalmente"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Comparar scale-up e scale-out em custo, limite e tolerância a falhas" },
+        { "level": 2, "type": "bug_hunt", "title": "Encontrar o estado local que quebra um serviço Spring ao rodar com 3 réplicas" },
+        { "level": 2, "type": "interview", "title": "Dimensionar a frota de API para 50k QPS de pico com p99 de 100 ms" },
+        { "level": 3, "type": "experiment", "title": "Escalar um serviço com Docker Compose de 1 para 4 réplicas e medir throughput com k6" },
+        { "level": 4, "type": "implementation", "title": "Migrar sessão HTTP em memória para Spring Session com Redis e validar com múltiplas instâncias" }
+      ]
+    },
+    "6.1.9": {
+      "summary": "Load balancers distribuem tráfego entre instâncias em L4 ou L7, com algoritmos (round robin, least connections, consistent hashing), health checks e terminação TLS, e precisam eles próprios ser redundantes.",
+      "objectives": [
+        "Diferenciar balanceamento L4 e L7 e quando usar cada um",
+        "Comparar round robin, weighted, least connections e consistent hashing por cenário",
+        "Configurar health checks ativos e passivos e explicar o impacto de intervalos e thresholds",
+        "Discutir sticky sessions e por que geralmente são um sinal de estado mal posicionado",
+        "Projetar redundância do próprio load balancer (active-passive, DNS, anycast)"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        { "key": "6.1.8", "kind": "recommended", "reason": "Load balancer é o que viabiliza a escala horizontal" },
+        { "key": "3.1.3", "kind": "recommended", "reason": "DNS é a primeira camada de distribuição de tráfego" },
+        { "key": "3.1.8", "kind": "recommended", "reason": "Balanceamento L7 opera sobre a semântica HTTP" }
+      ],
+      "checklist": [
+        "Escolho e justifico algoritmo e camada (L4/L7) para três cenários distintos",
+        "Explico o que acontece com requisições em andamento quando uma instância falha no health check",
+        "Mostro como o load balancer deixa de ser ponto único de falha"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Comparar L4 e L7: o que cada camada enxerga e pode decidir" },
+        { "level": 2, "type": "implementation", "title": "Configurar Nginx como load balancer L7 com health check e least_conn para 3 instâncias" },
+        { "level": 2, "type": "interview", "title": "Escolher o algoritmo de balanceamento para conexões WebSocket de longa duração" },
+        { "level": 3, "type": "experiment", "title": "Derrubar uma instância sob carga e medir erros durante a janela de detecção do health check" },
+        { "level": 4, "type": "coding", "title": "Implementar em Java um balanceador com round robin ponderado e remoção por health check" }
+      ]
+    },
+    "6.1.10": {
+      "summary": "Cache como bloco de construção: onde colocá-lo (cliente, CDN, aplicação, cache distribuído), padrões cache-aside, read-through e write-through, TTL e invalidação, dimensionados pelo working set.",
+      "objectives": [
+        "Posicionar camadas de cache e explicar o que cada uma economiza (latência, carga no banco, banda)",
+        "Comparar cache-aside, read-through, write-through e write-behind",
+        "Escolher TTL e estratégia de invalidação de acordo com a tolerância a dados obsoletos",
+        "Dimensionar memória do cache pelo working set e estimar hit ratio",
+        "Explicar política de eviction LRU/LFU e seu efeito no hit ratio"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        { "key": "6.1.4", "kind": "recommended", "reason": "O tamanho do cache é dimensionado pela estimativa de working set" },
+        { "key": "2.4.1", "kind": "recommended", "reason": "Hash table é a estrutura base de caches em memória" }
+      ],
+      "checklist": [
+        "Desenho onde ficam as camadas de cache num sistema read-heavy e justifico cada uma",
+        "Escolho padrão de escrita e TTL para dois tipos de dado com tolerâncias distintas",
+        "Calculo a memória necessária para um hit ratio alvo"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Comparar cache-aside, read-through e write-through em consistência e complexidade" },
+        { "level": 2, "type": "implementation", "title": "Implementar cache-aside com Spring Cache e Redis com TTL por tipo de dado" },
+        { "level": 2, "type": "interview", "title": "Dimensionar o cache para 10M perfis de usuário com hit ratio alvo de 90%" },
+        { "level": 3, "type": "experiment", "title": "Medir latência e carga no banco com e sem cache sob carga com k6" },
+        { "level": 4, "type": "coding", "title": "Implementar em Java um cache LRU com TTL e métricas de hit ratio" }
+      ]
+    },
+    "6.1.11": {
+      "summary": "CDN aproxima conteúdo estático e cacheável dos usuários por meio de edge servers, reduzindo latência e banda na origem, com controle via Cache-Control, invalidação e modelos push e pull.",
+      "objectives": [
+        "Explicar como uma requisição chega ao edge mais próximo (DNS geográfico, anycast)",
+        "Comparar CDN push e pull e quando cada um é adequado",
+        "Configurar Cache-Control, ETag e versionamento de assets para controlar cache no edge",
+        "Estimar a economia de banda na origem a partir do hit ratio da CDN",
+        "Discutir invalidação, conteúdo dinâmico e custos de egress"
+      ],
+      "estimatedMinutes": 45,
+      "prerequisites": [
+        { "key": "6.1.10", "kind": "recommended", "reason": "CDN é uma camada de cache distribuída geograficamente" },
+        { "key": "3.1.3", "kind": "recommended", "reason": "DNS direciona o cliente ao edge mais próximo" }
+      ],
+      "checklist": [
+        "Explico o caminho de uma requisição de imagem com cache miss e com cache hit no edge",
+        "Defino cabeçalhos de cache corretos para HTML, assets versionados e API",
+        "Calculo banda de origem economizada para um hit ratio dado"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Comparar CDN push e pull para catálogo de vídeos e para site de notícias" },
+        { "level": 2, "type": "bug_hunt", "title": "Encontrar o erro de Cache-Control que serve dados de um usuário para outro" },
+        { "level": 2, "type": "interview", "title": "Estimar banda de origem de um serviço de imagens com e sem CDN a 95% de hit ratio" },
+        { "level": 3, "type": "experiment", "title": "Inspecionar cabeçalhos de cache de sites reais e explicar a estratégia de cada um" },
+        { "level": 4, "type": "implementation", "title": "Configurar fingerprinting de assets e cabeçalhos de cache numa aplicação Spring atrás de um proxy" }
+      ]
+    },
+    "6.2.1": {
+      "summary": "URL Shortener é o problema clássico read-heavy: gerar chaves curtas únicas (base62 de contador vs hash), redirecionar com baixa latência via cache e escolher entre 301 e 302 conforme a necessidade de analytics.",
+      "objectives": [
+        "Levantar requisitos (criar, redirecionar, alias customizado, expiração) e estimar QPS de escrita e leitura com razão 100:1",
+        "Calcular o tamanho da chave: 62^7 ≈ 3,5 trilhões de combinações e o armazenamento em 5 anos",
+        "Comparar geração por contador distribuído + base62, hash truncado (MD5/SHA) com tratamento de colisão e Key Generation Service",
+        "Projetar o caminho de leitura com cache e CDN e justificar 301 vs 302",
+        "Discutir modelo de dados key-value, sharding pela chave curta e proteção contra abuso",
+        "Identificar gargalos (gerador de IDs, hot URLs) e evolução para 10x de tráfego"
+      ],
+      "estimatedMinutes": 150,
+      "prerequisites": [
+        { "key": "6.1.4", "kind": "recommended", "reason": "A estimativa de keyspace e armazenamento guia o tamanho da chave" },
+        { "key": "6.1.10", "kind": "recommended", "reason": "O caminho de redirect depende de cache para baixa latência" },
+        { "key": "2.4.1", "kind": "recommended", "reason": "Funções de hash e colisões são centrais na estratégia de geração por hash" }
+      ],
+      "checklist": [
+        "Resolvo o problema completo em 45 minutos cobrindo requisitos, estimativas, API, dados, arquitetura e deep dive",
+        "Justifico a estratégia de geração de IDs comparando colisões, previsibilidade e coordenação",
+        "Explico quando usar 301 e quando usar 302 e o impacto em cache e analytics",
+        "Tenho um encoder base62 em Java com testes de ida e volta"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Calcular keyspace de 6, 7 e 8 caracteres base62 e o tempo até esgotar a 1.000 escritas/s" },
+        { "level": 2, "type": "coding", "title": "Implementar encoder/decoder base62 em Java com testes de propriedade de ida e volta" },
+        { "level": 2, "type": "interview", "title": "Mock interview cronometrado de 45 minutos: URL Shortener com 100M URLs novas por mês" },
+        { "level": 3, "type": "conceptual", "title": "Comparar contador + base62, hash truncado com retry e Key Generation Service pré-alocado" },
+        { "level": 3, "type": "bug_hunt", "title": "Encontrar a condição de corrida na verificação de colisão de alias customizado" },
+        { "level": 4, "type": "project", "title": "Construir um URL Shortener em Spring Boot com PostgreSQL, Redis cache-aside e redirect 302 com contagem de cliques" }
+      ]
+    },
+    "6.2.2": {
+      "summary": "Rate Limiter distribuído protege serviços limitando requisições por cliente: escolha de algoritmo (token bucket, leaky bucket, fixed e sliding window), estado compartilhado em Redis com scripts Lua atômicos e comportamento sob falha.",
+      "objectives": [
+        "Levantar requisitos: chave de limitação, regras configuráveis, latência adicional < 5 ms e resposta 429 com cabeçalhos",
+        "Comparar token bucket, leaky bucket, fixed window, sliding window log e sliding window counter em precisão e memória",
+        "Projetar token bucket distribuído em Redis com script Lua para atomicidade de leitura e atualização",
+        "Estimar memória de Redis para milhões de chaves e QPS de verificação",
+        "Decidir posição (gateway, sidecar, biblioteca) e política fail-open vs fail-closed",
+        "Discutir sincronização entre regiões, clock skew e limites aproximados"
+      ],
+      "estimatedMinutes": 150,
+      "prerequisites": [
+        { "key": "5.2.8", "kind": "recommended", "reason": "Rate limiting como padrão de resiliência já foi introduzido; aqui é desenhado como sistema distribuído" },
+        { "key": "6.1.10", "kind": "recommended", "reason": "O estado do limitador vive num armazenamento em memória do tipo cache" },
+        { "key": "6.1.9", "kind": "recommended", "reason": "Ajuda a decidir em que camada de entrada o limitador fica" }
+      ],
+      "checklist": [
+        "Resolvo o problema em 45 minutos com escolha de algoritmo justificada",
+        "Explico por que GET + SET separados no Redis causam race condition e como Lua resolve",
+        "Defino e defendo a política de falha quando o Redis está indisponível",
+        "Tenho um token bucket em Java testado com relógio controlado"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Comparar os 5 algoritmos de rate limiting em precisão, memória e tolerância a bursts" },
+        { "level": 2, "type": "coding", "title": "Implementar token bucket em memória em Java com Clock injetável e testes de refill" },
+        { "level": 2, "type": "interview", "title": "Mock interview cronometrado de 45 minutos: rate limiter para API pública com 1M de clientes" },
+        { "level": 3, "type": "bug_hunt", "title": "Encontrar a race condition num rate limiter Redis com GET/INCR/EXPIRE separados" },
+        { "level": 3, "type": "experiment", "title": "Medir o burst permitido na borda de janela do fixed window versus sliding window counter" },
+        { "level": 4, "type": "implementation", "title": "Implementar token bucket distribuído com Redis + script Lua como filtro Spring com cabeçalhos X-RateLimit" }
+      ]
+    },
+    "6.2.3": {
+      "summary": "Distributed Message Queue desenhada do zero: log particionado e replicado, offsets e consumer groups, garantias de entrega, retenção e ordenação, inspirada em Kafka e comparada a filas tradicionais.",
+      "objectives": [
+        "Levantar requisitos: throughput de escrita, retenção, ordenação por chave e semântica de entrega",
+        "Projetar armazenamento como append-only log segmentado com índice de offsets",
+        "Explicar particionamento por chave, consumer groups e rebalanceamento",
+        "Projetar replicação com líder, ISR e acks e o trade-off entre durabilidade e latência",
+        "Comparar at-most-once, at-least-once e exactly-once e o custo de cada uma",
+        "Estimar armazenamento e banda para 1M mensagens/s com retenção de 7 dias"
+      ],
+      "estimatedMinutes": 180,
+      "prerequisites": [
+        { "key": "5.1.5", "kind": "recommended", "reason": "Kafka é a referência de design discutida no problema" },
+        { "key": "5.1.7", "kind": "recommended", "reason": "Partições são a unidade de paralelismo e ordenação" },
+        { "key": "5.3.1", "kind": "recommended", "reason": "Replicação do log determina durabilidade" },
+        { "key": "6.1.4", "kind": "recommended", "reason": "Estimativas de throughput e retenção dimensionam o cluster" }
+      ],
+      "checklist": [
+        "Resolvo o problema em 45 minutos cobrindo armazenamento, particionamento, replicação e entrega",
+        "Explico por que append-only com leitura sequencial atinge alto throughput",
+        "Justifico a configuração de acks e réplicas para um requisito de durabilidade dado",
+        "Implementei um log segmentado mínimo em Java com leitura por offset"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Comparar fila tradicional (RabbitMQ) e log distribuído (Kafka) em modelo de consumo e retenção" },
+        { "level": 2, "type": "interview", "title": "Mock interview cronometrado de 45 minutos: fila distribuída com 1M msg/s e retenção de 7 dias" },
+        { "level": 2, "type": "coding", "title": "Implementar em Java um append-only log segmentado com índice esparso de offsets" },
+        { "level": 3, "type": "conceptual", "title": "Analisar perda de mensagens com acks=1 durante failover de líder versus acks=all com min.insync.replicas=2" },
+        { "level": 3, "type": "experiment", "title": "Medir efeito de batch.size e linger.ms no throughput e latência de um produtor Kafka local" },
+        { "level": 4, "type": "project", "title": "Construir um broker mínimo com partições, consumer groups e commit de offset via HTTP" }
+      ]
+    },
+    "6.2.4": {
+      "summary": "Notification/Webhook System entrega eventos a canais (push, e-mail, SMS) e endpoints externos com confiabilidade: filas por canal, retries com backoff exponencial, idempotência no receptor, assinatura HMAC, DLQ e isolamento de clientes lentos.",
+      "objectives": [
+        "Levantar requisitos: canais, preferências do usuário, prioridade, latência e garantia at-least-once",
+        "Projetar pipeline com fila por canal/prioridade, workers e integração com provedores externos",
+        "Definir política de retry com backoff exponencial e jitter, limite de tentativas e dead letter queue",
+        "Garantir segurança e deduplicação de webhooks com assinatura HMAC, timestamp e event id",
+        "Isolar destinatários lentos ou indisponíveis com circuit breaker e filas por tenant",
+        "Estimar volume diário e picos de campanhas e o impacto nos provedores"
+      ],
+      "estimatedMinutes": 150,
+      "prerequisites": [
+        { "key": "5.2.3", "kind": "recommended", "reason": "Retry com backoff é a base da entrega confiável" },
+        { "key": "5.2.6", "kind": "recommended", "reason": "Entrega at-least-once exige idempotência no receptor" },
+        { "key": "5.2.7", "kind": "recommended", "reason": "Circuit breaker isola endpoints de webhook com falha" },
+        { "key": "6.2.3", "kind": "recommended", "reason": "O sistema se apoia numa fila distribuída para desacoplar produção e entrega" }
+      ],
+      "checklist": [
+        "Resolvo o problema em 45 minutos com política de retry e DLQ explícitas",
+        "Explico como um receptor valida assinatura e descarta duplicatas",
+        "Mostro como um cliente com endpoint lento não degrada a entrega para os demais",
+        "Implementei agendamento de retries com backoff exponencial e jitter em Java"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar por que webhooks são at-least-once e o que isso exige do receptor" },
+        { "level": 2, "type": "coding", "title": "Implementar em Java cálculo de backoff exponencial com full jitter e limite de tentativas" },
+        { "level": 2, "type": "interview", "title": "Mock interview cronometrado de 45 minutos: sistema de notificações com 100M envios/dia" },
+        { "level": 3, "type": "bug_hunt", "title": "Encontrar a falha de segurança na verificação de assinatura HMAC de um webhook (comparação não constante e replay)" },
+        { "level": 3, "type": "conceptual", "title": "Projetar isolamento por tenant para que um endpoint fora do ar não bloqueie a fila" },
+        { "level": 4, "type": "implementation", "title": "Construir dispatcher de webhooks em Spring com outbox, retries agendados, DLQ e assinatura HMAC" }
+      ]
+    },
+    "6.3.1": {
+      "summary": "Replication sob a ótica de design: escolher entre líder único, multi-líder e leaderless, replicação síncrona ou assíncrona, e quantificar o impacto em latência, durabilidade (RPO), failover (RTO) e leituras obsoletas.",
+      "objectives": [
+        "Escolher topologia de replicação a partir de requisitos de escrita, geografia e consistência",
+        "Quantificar o trade-off síncrono vs assíncrono em latência de escrita e RPO",
+        "Projetar read replicas para escalar leitura e tratar replication lag (read-your-writes, monotonic reads)",
+        "Explicar failover, split-brain e fencing e o RTO esperado",
+        "Defender numa entrevista a configuração de réplicas para um caso concreto"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        { "key": "5.3.1", "kind": "recommended", "reason": "Mecânica de replicação já estudada; aqui o foco é escolha e trade-off de design" },
+        { "key": "3.2.12", "kind": "recommended", "reason": "Visão introdutória de replicação de banco" },
+        { "key": "6.1.3", "kind": "recommended", "reason": "RPO, RTO e latência são requisitos não funcionais que guiam a escolha" }
+      ],
+      "checklist": [
+        "Escolho e justifico a topologia de replicação para três sistemas com requisitos diferentes",
+        "Explico como garantir read-your-writes com read replicas assíncronas",
+        "Relaciono configuração de replicação a RPO e RTO numéricos"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Comparar líder único, multi-líder e leaderless em conflitos, latência e disponibilidade" },
+        { "level": 2, "type": "interview", "title": "Escolher a replicação de um sistema de perfis com usuários em 3 continentes" },
+        { "level": 3, "type": "bug_hunt", "title": "Encontrar o bug de read-after-write causado por leitura em réplica atrasada" },
+        { "level": 3, "type": "experiment", "title": "Configurar PostgreSQL primário + réplica, induzir lag e medir leituras obsoletas" },
+        { "level": 4, "type": "implementation", "title": "Implementar roteamento de leitura em Spring que usa o primário por N segundos após escrita do usuário" }
+      ]
+    },
+    "6.3.2": {
+      "summary": "Partitioning divide dados em partes menores por range, hash ou lista para distribuir carga e armazenamento; a escolha da estratégia define quais queries são eficientes e onde surgem hotspots.",
+      "objectives": [
+        "Comparar particionamento por range, hash e lista em distribuição e suporte a range queries",
+        "Diferenciar particionamento horizontal e vertical e particionamento dentro de um nó versus entre nós",
+        "Explicar consistent hashing com virtual nodes e o volume de dados movido ao adicionar um nó",
+        "Avaliar índices secundários locais versus globais em sistemas particionados",
+        "Escolher chave de particionamento a partir dos padrões de acesso"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        { "key": "6.1.6", "kind": "recommended", "reason": "A chave de partição deriva do modelo de dados e dos padrões de acesso" },
+        { "key": "5.1.7", "kind": "recommended", "reason": "Partições de tópico ilustram particionamento por chave na prática" }
+      ],
+      "checklist": [
+        "Escolho a estratégia de particionamento para três cargas distintas justificando queries suportadas",
+        "Explico quanto dado é movido ao adicionar um nó com hash modular versus consistent hashing",
+        "Descrevo o custo de uma query por índice secundário global"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Comparar range e hash partitioning para logs ordenados por tempo" },
+        { "level": 2, "type": "coding", "title": "Implementar consistent hashing com virtual nodes em Java usando TreeMap" },
+        { "level": 3, "type": "experiment", "title": "Medir a fração de chaves remapeadas ao adicionar um nó: hash modular vs consistent hashing" },
+        { "level": 3, "type": "interview", "title": "Escolher chave de partição para pedidos consultados por cliente e por loja" },
+        { "level": 4, "type": "implementation", "title": "Configurar particionamento declarativo por range de data no PostgreSQL e comparar planos de execução" }
+      ]
+    },
+    "6.3.3": {
+      "summary": "Sharding distribui partições entre múltiplos bancos independentes; exige escolher shard key, roteamento, estratégia de rebalanceamento e lidar com queries e transações cross-shard.",
+      "objectives": [
+        "Escolher shard key avaliando cardinalidade, distribuição e localidade das queries",
+        "Comparar roteamento por lookup table, hash e range e onde fica a lógica de roteamento",
+        "Planejar resharding com mínima indisponibilidade (dual-write, backfill, cutover)",
+        "Explicar os custos de joins, agregações e transações cross-shard",
+        "Estimar quando o volume justifica sharding em vez de escala vertical ou read replicas"
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        { "key": "6.3.2", "kind": "required", "reason": "Sharding é a aplicação de particionamento entre bancos distintos" },
+        { "key": "6.1.4", "kind": "recommended", "reason": "A decisão de shardear parte das estimativas de volume e throughput" }
+      ],
+      "checklist": [
+        "Defendo uma shard key para um sistema dado e aponto o pior caso de distribuição",
+        "Descrevo um plano de resharding passo a passo sem downtime",
+        "Explico como tratar uma query que precisa de dados de vários shards"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Listar sinais de que um banco precisa de sharding e alternativas a tentar antes" },
+        { "level": 2, "type": "interview", "title": "Escolher a shard key de um sistema multi-tenant SaaS com tenants de tamanhos muito diferentes" },
+        { "level": 3, "type": "bug_hunt", "title": "Encontrar o problema numa shard key baseada em timestamp que concentra escritas" },
+        { "level": 3, "type": "conceptual", "title": "Planejar migração de 4 para 16 shards com dual-write e backfill" },
+        { "level": 4, "type": "implementation", "title": "Implementar em Spring um roteador de DataSource por shard key com AbstractRoutingDataSource" }
+      ]
+    },
+    "6.3.4": {
+      "summary": "Caching sob a ótica de escala e trade-offs: consistência entre cache e banco, invalidação distribuída, cache stampede, hot keys, cache de múltiplas camadas e o que acontece quando o cache falha.",
+      "objectives": [
+        "Analisar inconsistências entre cache e banco em escritas concorrentes e como mitigá-las",
+        "Prevenir cache stampede com request coalescing, locks, TTL com jitter e refresh antecipado",
+        "Tratar hot keys com cache local, replicação de chave e sharding do cache",
+        "Projetar o comportamento do sistema quando o cluster de cache cai (cold start, proteção do banco)",
+        "Decidir entre cache local, distribuído e multicamada com base em latência e consistência"
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        { "key": "6.1.10", "kind": "required", "reason": "Pressupõe padrões básicos de cache; aqui o foco é falhas e escala" },
+        { "key": "6.3.2", "kind": "recommended", "reason": "Caches distribuídos são particionados por consistent hashing" }
+      ],
+      "checklist": [
+        "Explico a sequência de eventos que deixa um valor obsoleto no cache após update e como evitá-la",
+        "Descrevo três técnicas contra stampede e quando usar cada uma",
+        "Projeto a proteção do banco para o cenário de perda total do cache"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar cache stampede, cache penetration e cache avalanche com exemplos" },
+        { "level": 2, "type": "bug_hunt", "title": "Encontrar a race condition entre update no banco e delete no cache que deixa valor obsoleto" },
+        { "level": 3, "type": "experiment", "title": "Provocar stampede expirando uma chave quente sob carga e medir o pico no banco" },
+        { "level": 3, "type": "interview", "title": "Projetar o cache de um placar ao vivo com uma única chave recebendo 500k leituras/s" },
+        { "level": 4, "type": "coding", "title": "Implementar request coalescing em Java com ConcurrentHashMap e CompletableFuture" }
+      ]
+    },
+    "6.3.5": {
+      "summary": "Queues como ferramenta de design: absorver picos (load leveling), desacoplar serviços, distribuir trabalho e controlar backpressure, avaliando latência adicional, ordenação, duplicatas e crescimento de backlog.",
+      "objectives": [
+        "Identificar quando uma fila melhora o desenho (picos, trabalho lento, desacoplamento) e quando só adiciona latência",
+        "Dimensionar consumidores a partir da taxa de chegada, tempo de processamento e SLA de backlog",
+        "Projetar backpressure e limites de fila para evitar crescimento ilimitado",
+        "Tratar mensagens venenosas com retries limitados e DLQ",
+        "Escolher entre fila de trabalho e pub/sub conforme o padrão de consumo"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        { "key": "5.1.2", "kind": "recommended", "reason": "Fundamentos de message queue" },
+        { "key": "5.1.3", "kind": "recommended", "reason": "Diferença entre fila de trabalho e pub/sub" },
+        { "key": "6.2.3", "kind": "recommended", "reason": "O desenho interno de uma fila distribuída explica seus limites" }
+      ],
+      "checklist": [
+        "Calculo quantos consumidores drenam um backlog dado dentro de um SLA",
+        "Explico como o sistema se comporta se os consumidores ficarem 1 hora fora do ar",
+        "Justifico quando não usar fila num fluxo síncrono"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar load leveling com um pico de Black Friday e uma fila na frente do processamento" },
+        { "level": 2, "type": "interview", "title": "Dimensionar workers de transcodificação de vídeo para 10k uploads/hora com SLA de 15 minutos" },
+        { "level": 3, "type": "conceptual", "title": "Aplicar a Lei de Little para relacionar backlog, taxa de chegada e tempo de espera" },
+        { "level": 3, "type": "bug_hunt", "title": "Encontrar a mensagem venenosa que trava uma partição e propor a correção" },
+        { "level": 4, "type": "implementation", "title": "Implementar consumidor com retries limitados, DLQ e métrica de lag em Spring Kafka" }
+      ]
+    },
+    "6.3.6": {
+      "summary": "Consistency sob a ótica de design: escolher o modelo de consistência por operação (linearizável, read-your-writes, causal, eventual) e justificar o custo em latência e disponibilidade diante dos requisitos do produto.",
+      "objectives": [
+        "Ordenar modelos de consistência do mais forte ao mais fraco e o que cada um garante ao usuário",
+        "Escolher consistência por funcionalidade num mesmo sistema (saldo vs contador de likes)",
+        "Usar quorums R + W > N para ajustar consistência em sistemas leaderless",
+        "Explicar consistência entre serviços com outbox e sagas em vez de transações distribuídas",
+        "Comunicar ao entrevistador o impacto visível ao usuário de cada escolha"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        { "key": "5.3.2", "kind": "recommended", "reason": "Base de strong consistency; aqui o foco é a escolha por caso de uso" },
+        { "key": "5.3.3", "kind": "recommended", "reason": "Base de eventual consistency" },
+        { "key": "5.3.4", "kind": "recommended", "reason": "Quorums permitem ajustar consistência por operação" },
+        { "key": "6.3.1", "kind": "recommended", "reason": "Replicação é a origem das anomalias de consistência" }
+      ],
+      "checklist": [
+        "Atribuo e justifico um modelo de consistência para cada funcionalidade de um sistema dado",
+        "Explico uma anomalia concreta de consistência eventual e como o usuário a perceberia",
+        "Calculo configurações de quorum que garantem leitura da última escrita"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Classificar 8 funcionalidades de uma rede social pelo modelo de consistência necessário" },
+        { "level": 2, "type": "interview", "title": "Escolher a consistência do estoque num e-commerce com reservas no checkout" },
+        { "level": 3, "type": "bug_hunt", "title": "Encontrar a anomalia causal: resposta de comentário visível antes do comentário original" },
+        { "level": 3, "type": "conceptual", "title": "Calcular combinações de N, R e W para leitura forte e para alta disponibilidade de escrita" },
+        { "level": 4, "type": "implementation", "title": "Implementar consistência entre pedido e estoque com Transactional Outbox e consumidor idempotente" }
+      ]
+    },
+    "6.3.7": {
+      "summary": "Availability mede a fração do tempo em que o sistema responde corretamente; é projetada com redundância, eliminação de dependências críticas e failover, e calculada para componentes em série e em paralelo.",
+      "objectives": [
+        "Calcular disponibilidade composta de componentes em série e em paralelo",
+        "Relacionar disponibilidade a MTBF e MTTR e mostrar por que reduzir MTTR é eficaz",
+        "Projetar redundância active-active e active-passive e comparar custos",
+        "Definir disponibilidade em termos de SLI/SLO e orçamento de erro",
+        "Avaliar disponibilidade multi-AZ e multi-região versus complexidade operacional"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        { "key": "3.3.6", "kind": "recommended", "reason": "SLI/SLO são a forma de medir disponibilidade" },
+        { "key": "6.1.3", "kind": "recommended", "reason": "Disponibilidade é um requisito não funcional central" }
+      ],
+      "checklist": [
+        "Calculo a disponibilidade de uma cadeia de 4 serviços em série e com redundância",
+        "Explico por que adicionar dependências síncronas reduz a disponibilidade total",
+        "Escolho entre active-active e active-passive para um caso concreto"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Calcular disponibilidade de 3 serviços de 99,9% em série e de 2 réplicas em paralelo" },
+        { "level": 2, "type": "interview", "title": "Atingir 99,99% num serviço que depende de um banco de 99,95%" },
+        { "level": 3, "type": "conceptual", "title": "Comparar o efeito de dobrar MTBF versus reduzir MTTR pela metade" },
+        { "level": 3, "type": "code_analysis", "title": "Analisar o grafo de dependências de um checkout e identificar o que derruba o SLO" },
+        { "level": 4, "type": "coding", "title": "Implementar em Java uma calculadora de disponibilidade composta a partir de um grafo de dependências" }
+      ]
+    },
+    "6.3.8": {
+      "summary": "CAP Theorem afirma que, durante uma partição de rede, um sistema distribuído escolhe entre consistência e disponibilidade; PACELC estende a análise para o trade-off entre latência e consistência sem partição.",
+      "objectives": [
+        "Enunciar CAP corretamente e explicar por que P não é opcional em sistemas distribuídos",
+        "Classificar sistemas reais (bancos, filas, coordenação) como CP ou AP durante partições",
+        "Aplicar PACELC para discutir latência vs consistência em operação normal",
+        "Identificar usos incorretos de CAP em argumentos de entrevista",
+        "Escolher comportamento CP ou AP por funcionalidade e justificar"
+      ],
+      "estimatedMinutes": 45,
+      "prerequisites": [
+        { "key": "6.3.6", "kind": "recommended", "reason": "CAP é um caso específico do trade-off entre modelos de consistência" },
+        { "key": "6.3.7", "kind": "recommended", "reason": "O A de CAP é diferente da disponibilidade operacional medida em noves" }
+      ],
+      "checklist": [
+        "Explico CAP sem cair no erro de \"escolher 2 de 3\" livremente",
+        "Classifico três sistemas conhecidos em PACELC com justificativa",
+        "Decido o comportamento de uma funcionalidade durante partição de rede"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Desmontar o mito do \"escolha 2 de 3\" com um cenário de partição de rede" },
+        { "level": 2, "type": "interview", "title": "Decidir comportamento CP ou AP para carrinho, pagamento e catálogo durante partição" },
+        { "level": 3, "type": "conceptual", "title": "Classificar PostgreSQL com réplica síncrona, Cassandra e ZooKeeper em PACELC" },
+        { "level": 3, "type": "experiment", "title": "Simular partição num cluster Redis ou etcd com Docker e observar o comportamento" },
+        { "level": 4, "type": "project", "title": "Escrever um ADR justificando escolhas CAP/PACELC para cada armazenamento de um sistema" }
+      ]
+    },
+    "6.3.9": {
+      "summary": "Hotspots são concentrações de carga numa chave, partição ou nó (celebridades, eventos virais, chaves sequenciais) que anulam a escala horizontal; são mitigados com salting, cache, replicação de leitura e redesenho da chave.",
+      "objectives": [
+        "Identificar fontes de hotspot: chaves populares, chaves monotônicas e distribuição Zipf",
+        "Detectar hotspots com métricas por partição e por chave",
+        "Mitigar hot writes com key salting e agregação local",
+        "Mitigar hot reads com cache local, replicação de chave e CDN",
+        "Explicar o custo de cada mitigação em complexidade de leitura e consistência"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        { "key": "6.3.3", "kind": "recommended", "reason": "Hotspots surgem da escolha de shard key" },
+        { "key": "6.3.4", "kind": "recommended", "reason": "Cache é a principal mitigação de hot reads" }
+      ],
+      "checklist": [
+        "Explico por que uma chave sequencial cria hotspot de escrita",
+        "Proponho mitigação para hot read e para hot write com seus custos",
+        "Sei quais métricas mostram que há um hotspot"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar a distribuição Zipf e por que 1% das chaves recebe a maior parte do tráfego" },
+        { "level": 2, "type": "interview", "title": "Tratar o contador de likes de um post viral com 1M de likes por minuto" },
+        { "level": 3, "type": "experiment", "title": "Gerar carga Zipf contra um sistema particionado simulado e medir a carga por partição" },
+        { "level": 3, "type": "bug_hunt", "title": "Encontrar o hotspot causado por shard key com prefixo de data" },
+        { "level": 4, "type": "coding", "title": "Implementar contador distribuído com key salting e agregação periódica em Java + Redis" }
+      ]
+    },
+    "6.3.10": {
+      "summary": "Single Point of Failure é qualquer componente cuja falha derruba o sistema; eliminá-lo exige redundância em todas as camadas, incluindo dependências escondidas como DNS, configuração, certificados e pessoas.",
+      "objectives": [
+        "Mapear SPOFs em todas as camadas: rede, LB, aplicação, dados, configuração e terceiros",
+        "Propor redundância para cada SPOF e avaliar custo versus risco",
+        "Identificar SPOFs ocultos (certificados, DNS, coordenação, região única, deploy)",
+        "Explicar como failover pode criar novos riscos (split-brain, thundering herd)",
+        "Priorizar a eliminação de SPOFs pelo impacto no SLO"
+      ],
+      "estimatedMinutes": 45,
+      "prerequisites": [
+        { "key": "6.3.7", "kind": "recommended", "reason": "SPOFs são o principal limitador da disponibilidade composta" },
+        { "key": "6.1.9", "kind": "recommended", "reason": "Redundância do próprio load balancer é um caso clássico" }
+      ],
+      "checklist": [
+        "Encontro todos os SPOFs de um diagrama de referência, incluindo os não óbvios",
+        "Proponho e priorizo mitigações com estimativa de custo",
+        "Explico um risco introduzido pelo próprio mecanismo de failover"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Listar SPOFs em cada camada de uma aplicação web típica" },
+        { "level": 2, "type": "bug_hunt", "title": "Encontrar os 6 SPOFs, incluindo os ocultos, num diagrama de arquitetura" },
+        { "level": 3, "type": "conceptual", "title": "Estudar um postmortem público e identificar o SPOF que causou o incidente" },
+        { "level": 3, "type": "interview", "title": "Eliminar SPOFs de um sistema single-region sem dobrar o custo" },
+        { "level": 4, "type": "experiment", "title": "Executar um game day local derrubando componentes um a um e registrar o impacto" }
+      ]
+    },
+    "6.3.11": {
+      "summary": "Fault tolerance sob a ótica de design: decidir quais falhas o sistema deve tolerar, projetar degradação graciosa, bulkheads e redundância por camada, e validar com testes de caos contra SLOs.",
+      "objectives": [
+        "Definir o modelo de falhas a tolerar (nó, AZ, região, dependência, dados corrompidos)",
+        "Projetar degradação graciosa e fallbacks por funcionalidade",
+        "Combinar timeouts, retries, circuit breakers e bulkheads de forma coerente numa cadeia de chamadas",
+        "Evitar falhas em cascata e retry storms com orçamento de retry",
+        "Validar tolerância a falhas com chaos engineering e medir contra SLO"
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        { "key": "5.2.9", "kind": "recommended", "reason": "Padrões de tolerância a falhas já estudados; aqui o foco é decidir o que tolerar e como no desenho" },
+        { "key": "5.2.7", "kind": "recommended", "reason": "Circuit breaker é peça central contra falhas em cascata" },
+        { "key": "6.3.10", "kind": "recommended", "reason": "Tolerância a falhas começa pela eliminação de SPOFs" }
+      ],
+      "checklist": [
+        "Defino o modelo de falhas e o comportamento degradado de cada funcionalidade de um sistema",
+        "Configuro timeouts e retries numa cadeia de 3 serviços sem amplificação de carga",
+        "Executei um experimento de falha e comparei o resultado ao esperado"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Diferenciar fault tolerance, alta disponibilidade e resiliência com exemplos" },
+        { "level": 2, "type": "interview", "title": "Projetar degradação graciosa da home de um e-commerce quando o serviço de recomendações cai" },
+        { "level": 3, "type": "bug_hunt", "title": "Encontrar o retry storm causado por retries em todas as camadas com timeouts invertidos" },
+        { "level": 3, "type": "experiment", "title": "Injetar latência com Toxiproxy numa dependência e medir o efeito com e sem bulkhead" },
+        { "level": 4, "type": "implementation", "title": "Implementar fallback, bulkhead e orçamento de retry com Resilience4j numa cadeia de serviços Spring" }
+      ]
+    },
+    "6.4.1": {
+      "summary": "Feed / Social Network exige gerar timelines personalizadas em baixa latência: fan-out on write vs on read, modelo híbrido para celebridades, armazenamento de grafo social, ranking e cache de timeline.",
+      "objectives": [
+        "Levantar requisitos (postar, seguir, timeline, likes) e estimar QPS de leitura de timeline e de escrita de posts para 300M DAU",
+        "Comparar fan-out on write, fan-out on read e o modelo híbrido para contas com milhões de seguidores",
+        "Projetar armazenamento de posts, grafo social e timelines pré-computadas em cache",
+        "Estimar memória de timelines em cache (N posts por usuário ativo) e custo de fan-out",
+        "Discutir paginação por cursor, ranking e consistência eventual da timeline",
+        "Identificar gargalos (celebridades, hot posts) e a evolução da arquitetura com o crescimento"
+      ],
+      "estimatedMinutes": 180,
+      "prerequisites": [
+        { "key": "6.1.4", "kind": "recommended", "reason": "O fan-out é decidido com base em estimativas de leitura e escrita" },
+        { "key": "6.3.4", "kind": "recommended", "reason": "Timelines pré-computadas dependem de cache em escala" },
+        { "key": "6.3.9", "kind": "recommended", "reason": "Celebridades são o hotspot central do problema" },
+        { "key": "6.3.5", "kind": "recommended", "reason": "O fan-out on write é executado de forma assíncrona por filas" }
+      ],
+      "checklist": [
+        "Resolvo o problema em 45 minutos com estimativas e escolha de fan-out justificada",
+        "Explico o modelo híbrido e o limiar para tratar uma conta como celebridade",
+        "Calculo memória necessária para timelines em cache",
+        "Implementei um merge de timelines em Java"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Comparar fan-out on write e on read em latência de leitura, custo de escrita e armazenamento" },
+        { "level": 2, "type": "interview", "title": "Mock interview cronometrado de 45 minutos: timeline do Twitter com 300M DAU" },
+        { "level": 2, "type": "coding", "title": "Implementar em Java o merge k-way de timelines ordenadas com PriorityQueue e paginação por cursor" },
+        { "level": 3, "type": "conceptual", "title": "Calcular o custo de fan-out de um post de conta com 50M de seguidores e definir o limiar do híbrido" },
+        { "level": 3, "type": "bug_hunt", "title": "Encontrar duplicatas e itens perdidos numa paginação por offset de timeline" },
+        { "level": 4, "type": "project", "title": "Construir um serviço de feed com fan-out on write via Kafka e timelines em Redis Sorted Sets" }
+      ]
+    },
+    "6.4.2": {
+      "summary": "Chat / Realtime System exige conexões persistentes em escala: WebSockets, roteamento de mensagens entre servidores de conexão, ordenação por conversa, entrega offline, presença e confirmações de leitura.",
+      "objectives": [
+        "Levantar requisitos (1:1, grupos, histórico, presença, recibos) e estimar conexões simultâneas e mensagens/s",
+        "Comparar polling, long polling, SSE e WebSocket para entrega em tempo real",
+        "Projetar servidores de conexão stateful, registro de sessão e roteamento via pub/sub",
+        "Garantir ordenação por conversa com IDs sequenciais por canal ou Snowflake IDs",
+        "Projetar armazenamento de mensagens wide-column particionado por conversa e entrega offline com push",
+        "Discutir presença com heartbeats, fan-out em grupos grandes e reconexão em massa"
+      ],
+      "estimatedMinutes": 180,
+      "prerequisites": [
+        { "key": "5.1.3", "kind": "recommended", "reason": "Pub/sub roteia mensagens entre servidores de conexão" },
+        { "key": "6.1.9", "kind": "recommended", "reason": "Balancear conexões de longa duração exige estratégia específica" },
+        { "key": "6.3.2", "kind": "recommended", "reason": "Mensagens são particionadas por conversa" },
+        { "key": "6.2.4", "kind": "recommended", "reason": "Entrega offline reutiliza o sistema de notificações" }
+      ],
+      "checklist": [
+        "Resolvo o problema em 45 minutos com roteamento entre servidores de conexão explicado",
+        "Explico como garanto ordem e ausência de duplicatas numa conversa",
+        "Descrevo o que acontece quando um servidor com 500k conexões cai",
+        "Implementei um gerador de IDs ordenáveis em Java"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Comparar polling, long polling, SSE e WebSocket em latência, overhead e escalabilidade" },
+        { "level": 2, "type": "interview", "title": "Mock interview cronometrado de 45 minutos: WhatsApp com 50M conexões simultâneas" },
+        { "level": 2, "type": "coding", "title": "Implementar em Java um gerador Snowflake ID thread-safe com tratamento de clock skew" },
+        { "level": 3, "type": "conceptual", "title": "Projetar a reconexão de 500k clientes após queda de servidor sem thundering herd" },
+        { "level": 3, "type": "bug_hunt", "title": "Encontrar a causa de mensagens fora de ordem ao usar timestamp do cliente" },
+        { "level": 4, "type": "project", "title": "Construir chat em Spring WebSocket com múltiplas instâncias roteando via Redis Pub/Sub" }
+      ]
+    },
+    "6.4.3": {
+      "summary": "Distributed Storage (key-value ou object storage) combina particionamento por consistent hashing, replicação com quorums, detecção de falhas, reparo anti-entropia e resolução de conflitos, no estilo Dynamo e S3.",
+      "objectives": [
+        "Levantar requisitos (get/put, tamanho de objetos, durabilidade de 11 noves, disponibilidade) e estimar capacidade e número de nós",
+        "Projetar particionamento com consistent hashing e virtual nodes e replicação em N nós",
+        "Configurar quorums R/W e explicar sloppy quorum e hinted handoff",
+        "Explicar detecção de falhas com gossip e reparo com Merkle trees",
+        "Comparar resolução de conflitos com vector clocks e last-write-wins",
+        "Separar metadados e dados em object storage e discutir erasure coding versus replicação"
+      ],
+      "estimatedMinutes": 210,
+      "prerequisites": [
+        { "key": "5.3.4", "kind": "recommended", "reason": "Quorums são o mecanismo central de consistência ajustável" },
+        { "key": "6.3.1", "kind": "recommended", "reason": "Escolha de topologia de replicação leaderless" },
+        { "key": "6.3.2", "kind": "required", "reason": "Consistent hashing é a base do posicionamento de dados" },
+        { "key": "6.3.8", "kind": "recommended", "reason": "O sistema é desenhado como AP com consistência ajustável" }
+      ],
+      "checklist": [
+        "Resolvo o problema em 45 minutos cobrindo particionamento, replicação, falhas e conflitos",
+        "Explico como o sistema continua aceitando escritas com um nó fora do ar",
+        "Comparo custo de armazenamento de replicação 3x e erasure coding",
+        "Implementei um key-value store com quorum simulado em Java"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar o caminho de um put com N=3, W=2 e um nó indisponível (hinted handoff)" },
+        { "level": 2, "type": "interview", "title": "Mock interview cronometrado de 45 minutos: key-value store distribuído estilo Dynamo" },
+        { "level": 2, "type": "coding", "title": "Implementar em Java comparação de Merkle trees para detectar divergência entre réplicas" },
+        { "level": 3, "type": "conceptual", "title": "Comparar replicação 3x e erasure coding 6+3 em custo, durabilidade e latência de leitura" },
+        { "level": 3, "type": "bug_hunt", "title": "Encontrar a perda de escrita causada por last-write-wins com clock skew" },
+        { "level": 4, "type": "project", "title": "Construir key-value store em Java com consistent hashing, replicação e quorum R/W configurável" }
+      ]
+    },
+    "6.4.4": {
+      "summary": "Payment System prioriza correção sobre latência: idempotency keys contra cobranças duplicadas, ledger de dupla entrada imutável, máquina de estados de pagamento, integração assíncrona com PSPs e reconciliação diária.",
+      "objectives": [
+        "Levantar requisitos (cobrar, estornar, consultar, payout) e NFRs de correção, auditoria e conformidade PCI",
+        "Projetar idempotency keys de ponta a ponta para evitar cobrança dupla em retries e timeouts",
+        "Modelar ledger de dupla entrada imutável onde a soma de débitos e créditos é sempre zero",
+        "Projetar a máquina de estados do pagamento e o tratamento de callbacks assíncronos do PSP",
+        "Projetar reconciliação entre ledger interno, PSP e extrato bancário e o tratamento de divergências",
+        "Discutir consistência com sagas e outbox, valores monetários em BigDecimal/centavos e trilha de auditoria"
+      ],
+      "estimatedMinutes": 210,
+      "prerequisites": [
+        { "key": "3.5.11", "kind": "recommended", "reason": "Idempotência de APIs é o primeiro requisito de correção" },
+        { "key": "5.3.8", "kind": "recommended", "reason": "Outbox garante publicação confiável de eventos de pagamento" },
+        { "key": "5.3.9", "kind": "recommended", "reason": "Sagas coordenam cobrança, ledger e serviços dependentes" },
+        { "key": "6.3.6", "kind": "recommended", "reason": "Exige escolher consistência forte onde há dinheiro envolvido" }
+      ],
+      "checklist": [
+        "Resolvo o problema em 45 minutos com idempotência, ledger e reconciliação explicados",
+        "Explico o que acontece num timeout após o PSP ter cobrado e como evito cobrança dupla",
+        "Modelo lançamentos de dupla entrada para cobrança, taxa e estorno",
+        "Implementei um ledger em Java com invariante de soma zero testada"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Explicar dupla entrada com os lançamentos de uma compra com taxa do PSP e estorno parcial" },
+        { "level": 2, "type": "interview", "title": "Mock interview cronometrado de 45 minutos: sistema de pagamentos de um marketplace" },
+        { "level": 2, "type": "coding", "title": "Implementar em Java um ledger imutável de dupla entrada com invariante de soma zero e BigDecimal" },
+        { "level": 3, "type": "bug_hunt", "title": "Encontrar a cobrança dupla causada por retry após timeout sem idempotency key persistida" },
+        { "level": 3, "type": "conceptual", "title": "Projetar o job de reconciliação diária entre ledger, relatório do PSP e extrato bancário" },
+        { "level": 4, "type": "project", "title": "Construir serviço de pagamentos em Spring com idempotency keys, máquina de estados, ledger e outbox" }
+      ]
+    },
+    "6.4.5": {
+      "summary": "Mock interviews cronometradas simulam a entrevista real de ponta a ponta, com rubrica de avaliação (requisitos, estimativas, desenho, profundidade, trade-offs, comunicação) e revisão estruturada para corrigir pontos fracos.",
+      "objectives": [
+        "Executar simulações completas de 45 minutos sem consultar material",
+        "Aplicar uma rubrica de avaliação a si mesmo e a outros candidatos",
+        "Atuar como entrevistador conduzindo perguntas de aprofundamento",
+        "Registrar e acompanhar a evolução dos pontos fracos entre simulações",
+        "Ajustar a profundidade conforme o nível da vaga (pleno, sênior, staff)"
+      ],
+      "estimatedMinutes": 240,
+      "prerequisites": [
+        { "key": "6.1.1", "kind": "required", "reason": "A mock interview aplica o roteiro de condução da entrevista" },
+        { "key": "6.2.1", "kind": "recommended", "reason": "Ter resolvido problemas clássicos antes dá repertório para a simulação" }
+      ],
+      "checklist": [
+        "Completei ao menos 3 mock interviews cronometradas com problemas diferentes",
+        "Avaliei cada simulação com rubrica escrita e registrei ações de melhoria",
+        "Atuei como entrevistador ao menos uma vez",
+        "Meu tempo nas fases iniciais está dentro do orçamento planejado"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Construir a rubrica de avaliação com critérios e níveis por dimensão" },
+        { "level": 2, "type": "interview", "title": "Mock interview cronometrado de 45 minutos: Google Drive (problema não praticado antes)" },
+        { "level": 2, "type": "code_analysis", "title": "Avaliar com a rubrica a gravação de uma entrevista de System Design pública" },
+        { "level": 3, "type": "interview", "title": "Mock interview cronometrado de 45 minutos: Ticketmaster com venda concorrente de assentos" },
+        { "level": 3, "type": "experiment", "title": "Conduzir uma simulação como entrevistador com perguntas de aprofundamento preparadas" },
+        { "level": 4, "type": "project", "title": "Montar um diário de mock interviews com rubrica, pontuações e plano de melhoria por semana" }
+      ]
+    },
+    "6.4.6": {
+      "summary": "Explicar trade-offs é a habilidade central avaliada em System Design: apresentar alternativas, critérios de decisão, a escolha feita e o custo aceito, ligando cada decisão a requisitos e números.",
+      "objectives": [
+        "Estruturar explicações no formato opções → critérios → decisão → custo aceito → quando mudaria",
+        "Identificar o eixo de cada trade-off clássico (consistência vs disponibilidade, latência vs custo, simplicidade vs escala)",
+        "Ligar cada trade-off a um requisito não funcional ou a uma estimativa",
+        "Antecipar contra-argumentos do entrevistador e responder sem abandonar a decisão sem motivo",
+        "Registrar decisões em ADRs com contexto, alternativas e consequências"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        { "key": "6.3.8", "kind": "recommended", "reason": "CAP/PACELC é o trade-off mais citado e mais mal explicado" },
+        { "key": "6.3.6", "kind": "recommended", "reason": "Consistência é eixo recorrente dos trade-offs" }
+      ],
+      "checklist": [
+        "Explico 5 trade-offs clássicos no formato estruturado em menos de 2 minutos cada",
+        "Cada trade-off que apresento cita o requisito ou número que o decide",
+        "Escrevi ao menos um ADR completo para uma decisão real ou simulada"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Catalogar 10 trade-offs clássicos com o eixo de decisão de cada um" },
+        { "level": 2, "type": "interview", "title": "Defender SQL vs NoSQL para um catálogo de produtos diante de contra-argumentos do entrevistador" },
+        { "level": 2, "type": "code_analysis", "title": "Reescrever justificativas vagas (\"porque escala\") em trade-offs estruturados" },
+        { "level": 3, "type": "interview", "title": "Explicar em 2 minutos o trade-off de fan-out híbrido e quando voltaria a fan-out on read" },
+        { "level": 4, "type": "project", "title": "Escrever 3 ADRs para decisões de um dos problemas práticos resolvidos na etapa" }
+      ]
+    },
+    "6.4.7": {
+      "summary": "Identificar gargalos é localizar o componente que limita throughput ou latência (CPU, I/O, banco, rede, locks, hot keys) usando estimativas e métricas, e propor a correção de menor custo antes de redesenhar tudo.",
+      "objectives": [
+        "Usar estimativas para prever qual componente satura primeiro",
+        "Diagnosticar gargalos com métricas USE/RED, latência por percentil e profiling",
+        "Distinguir gargalos de CPU, memória, I/O, rede, contenção de locks e pool de conexões",
+        "Propor correções em ordem de custo: tuning, cache, índices, réplicas, filas, sharding",
+        "Explicar como resolver um gargalo desloca o limite para o próximo componente"
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        { "key": "6.1.4", "kind": "recommended", "reason": "Estimativas permitem prever gargalos antes de medi-los" },
+        { "key": "3.3.6", "kind": "recommended", "reason": "SLIs indicam quando um gargalo viola o objetivo" },
+        { "key": "6.3.9", "kind": "recommended", "reason": "Hotspots são uma classe frequente de gargalo" }
+      ],
+      "checklist": [
+        "Aponto o primeiro gargalo de um desenho dado usando apenas números",
+        "Diagnostiquei um gargalo real com métricas e profiling e documentei a causa",
+        "Proponho correções ordenadas por custo e explico o próximo gargalo"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Aplicar métodos USE e RED para classificar sinais de saturação" },
+        { "level": 2, "type": "interview", "title": "Encontrar o gargalo de um sistema de 20k QPS com um único PostgreSQL e pool de 50 conexões" },
+        { "level": 3, "type": "experiment", "title": "Sob carga com k6, identificar via Actuator e profiler se o limite é CPU, pool ou banco" },
+        { "level": 3, "type": "bug_hunt", "title": "Encontrar o lock contencioso que limita o throughput de um serviço Java" },
+        { "level": 4, "type": "project", "title": "Relatório de gargalos de um projeto próprio com medições antes e depois de cada correção" }
+      ]
+    },
+    "6.4.8": {
+      "summary": "Evoluir a arquitetura conforme a escala é planejar a progressão de um monólito com um banco até um sistema distribuído multi-região, adicionando cada componente apenas quando um gargalo ou requisito o justifica.",
+      "objectives": [
+        "Descrever a evolução típica de 1k a 100M usuários e o gatilho de cada mudança",
+        "Associar cada etapa (réplicas, cache, CDN, filas, sharding, multi-região) a um gargalo medido",
+        "Planejar migrações incrementais sem downtime (strangler fig, dual-write, feature flags)",
+        "Evitar overengineering explicando o custo operacional de cada componente adicionado",
+        "Responder a \"e se o tráfego crescer 10x?\" com um plano concreto e priorizado"
+      ],
+      "estimatedMinutes": 90,
+      "prerequisites": [
+        { "key": "6.4.7", "kind": "recommended", "reason": "Cada passo de evolução é disparado por um gargalo identificado" },
+        { "key": "6.3.3", "kind": "recommended", "reason": "Sharding é um dos passos mais caros da evolução" },
+        { "key": "6.1.8", "kind": "recommended", "reason": "Escala horizontal da aplicação é o primeiro passo típico" }
+      ],
+      "checklist": [
+        "Desenho a evolução de um sistema em 4 estágios de escala com o gatilho de cada um",
+        "Respondo \"e se crescer 10x?\" para um problema praticado com plano priorizado",
+        "Descrevo uma migração incremental sem downtime passo a passo"
+      ],
+      "plannedChallenges": [
+        { "level": 1, "type": "conceptual", "title": "Mapear a evolução de 1k para 100M usuários e o gatilho de cada componente" },
+        { "level": 2, "type": "interview", "title": "Responder \"e se crescer 10x?\" para o URL Shortener e o Rate Limiter já desenhados" },
+        { "level": 3, "type": "code_analysis", "title": "Avaliar uma arquitetura superdimensionada para 10k usuários e propor a versão mínima" },
+        { "level": 3, "type": "conceptual", "title": "Planejar a migração de monólito para serviços com strangler fig sem downtime" },
+        { "level": 4, "type": "project", "title": "Documentar o roadmap arquitetural de um projeto próprio para 3 ordens de grandeza de crescimento" }
+      ]
+    }
+  }
+}

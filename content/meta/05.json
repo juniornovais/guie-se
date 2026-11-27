@@ -1,0 +1,1832 @@
+{
+  "stage": "05",
+  "modules": {
+    "5.1": {
+      "description": "Comunicação assíncrona entre serviços: filas, Pub/Sub e arquitetura orientada a eventos, com Kafka como estudo de caso principal. Cobre o log particionado, offsets, consumer groups e rebalanceamento, garantias de ordenação e as semânticas de entrega (at-most-once, at-least-once e exactly-once), incluindo o que cada uma custa em latência, throughput e complexidade.",
+      "objectives": [
+        "Decidir entre comunicação síncrona e assíncrona com base em acoplamento, latência e disponibilidade",
+        "Diferenciar Message Queue, Pub/Sub e event streaming e escolher o modelo adequado a um caso real",
+        "Explicar o funcionamento interno do Kafka: log particionado, réplicas, ISR, acks e retenção",
+        "Operar consumer groups entendendo atribuição de partições, rebalanceamento e commit de offsets",
+        "Garantir ordenação onde ela é necessária por meio da escolha da chave de partição",
+        "Escolher e implementar a semântica de entrega correta (at-most-once, at-least-once, exactly-once) e justificar o custo"
+      ]
+    },
+    "5.2": {
+      "description": "Em sistemas distribuídos, falhas são parciais e ambíguas: um nó lento é indistinguível de um nó morto. Este módulo trata dos mecanismos que tornam serviços resilientes — timeouts, retries com exponential backoff e jitter, idempotência sob entrega at-least-once, circuit breaker, rate limiting — e de como combiná-los em uma estratégia de fault tolerance sem amplificar falhas.",
+      "objectives": [
+        "Reconhecer falhas parciais e a ambiguidade de resultado de uma chamada remota",
+        "Configurar timeouts de conexão, leitura e deadlines de ponta a ponta de forma coerente",
+        "Implementar retries seguros com exponential backoff e jitter, evitando retry storms e thundering herd",
+        "Tornar operações idempotentes para suportar retries e entrega duplicada",
+        "Aplicar circuit breaker e rate limiting entendendo seus estados, algoritmos e parâmetros",
+        "Projetar fault tolerance combinando redundância, bulkheads, fallback e degradação graciosa"
+      ]
+    },
+    "5.3": {
+      "description": "Como manter dados coerentes quando eles vivem em várias máquinas ou em vários serviços. Cobre replicação e modelos de consistência (forte e eventual), quorums R+W>N, consenso em alto nível (Raft), e as alternativas para transações que atravessam serviços: 2PC e seus bloqueios, Transactional Outbox para publicar eventos de forma confiável e Saga com compensações, orquestrada ou coreografada.",
+      "objectives": [
+        "Explicar replicação líder-seguidor, multi-líder e leaderless e o impacto de replication lag",
+        "Diferenciar consistência forte (linearizability) e eventual e relacionar com o teorema CAP e PACELC",
+        "Calcular configurações de quorum e explicar quando R+W>N garante leitura do último valor",
+        "Descrever eleição de líder e replicação de log no Raft em alto nível",
+        "Comparar 2PC, Transactional Outbox e Saga quanto a consistência, disponibilidade e acoplamento",
+        "Implementar Outbox e Saga com compensações em Java, escolhendo entre orquestração e coreografia"
+      ]
+    }
+  },
+  "topics": {
+    "5.1.1": {
+      "summary": "Na comunicação síncrona o chamador bloqueia esperando a resposta e herda a disponibilidade e a latência do chamado; na assíncrona, um intermediário (fila ou log) desacopla produtor e consumidor no tempo, ao custo de consistência eventual e maior complexidade operacional.",
+      "objectives": [
+        "Explicar acoplamento temporal e como ele afeta a disponibilidade composta de uma cadeia de chamadas síncronas",
+        "Calcular a disponibilidade de uma cadeia de N serviços síncronos dado o SLA de cada um",
+        "Distinguir I/O assíncrono dentro do processo (CompletableFuture, non-blocking) de comunicação assíncrona entre serviços",
+        "Identificar quando o cliente precisa de resposta imediata e quando aceita processamento posterior (202 Accepted)",
+        "Listar os custos da assincronia: depuração, ordenação, duplicatas e consistência eventual"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "3.1.8",
+          "kind": "recommended",
+          "reason": "A comunicação síncrona entre serviços normalmente é feita sobre HTTP"
+        },
+        {
+          "key": "4.4.10",
+          "kind": "recommended",
+          "reason": "Ajuda a separar assincronia no processo de assincronia entre serviços"
+        }
+      ],
+      "checklist": [
+        "Calculo a disponibilidade efetiva de uma cadeia síncrona e explico por que ela cai com cada dependência",
+        "Justifico, para um fluxo de checkout, quais etapas devem ser síncronas e quais assíncronas",
+        "Explico por que CompletableFuture não elimina o acoplamento temporal entre serviços",
+        "Descrevo como o cliente acompanha o resultado de uma operação assíncrona (polling, webhook, eventos)"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar acoplamento temporal e calcular a disponibilidade de uma cadeia de 4 serviços síncronos a 99,9%"
+        },
+        {
+          "level": 2,
+          "type": "code_analysis",
+          "title": "Classificar as chamadas de um fluxo de pedido em Java entre síncronas necessárias e candidatas a assíncronas"
+        },
+        {
+          "level": 2,
+          "type": "interview",
+          "title": "Entrevista: quando você NÃO usaria comunicação assíncrona entre serviços?"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Medir em Java o impacto de uma dependência lenta numa chamada HTTP síncrona versus envio para fila"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Converter um endpoint síncrono em 202 Accepted com processamento em fila e endpoint de status"
+        }
+      ]
+    },
+    "5.1.2": {
+      "summary": "Uma Message Queue entrega cada mensagem a um único consumidor dentre os concorrentes (competing consumers), com confirmação (ack), redelivery e dead-letter queue; após o ack a mensagem é removida, o que a diferencia de um log replayable.",
+      "objectives": [
+        "Descrever o ciclo de vida de uma mensagem: publish, entrega, ack/nack, redelivery e DLQ",
+        "Explicar o padrão competing consumers e seu efeito na ordenação",
+        "Configurar visibility timeout/prefetch e explicar seu impacto em duplicatas e throughput",
+        "Projetar uma estratégia de DLQ com limite de tentativas e reprocessamento",
+        "Comparar brokers de fila (RabbitMQ, SQS) com um log distribuído (Kafka)"
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        {
+          "key": "2.1.8",
+          "kind": "recommended",
+          "reason": "O comportamento FIFO da estrutura Queue é a base do modelo"
+        },
+        {
+          "key": "5.1.1",
+          "kind": "recommended",
+          "reason": "Filas são o principal mecanismo de comunicação assíncrona"
+        }
+      ],
+      "checklist": [
+        "Explico o que acontece com uma mensagem quando o consumidor morre antes de dar ack",
+        "Justifico o valor de max-retries antes de mover para a DLQ em um caso concreto",
+        "Explico por que competing consumers quebram a ordem global",
+        "Diferencio fila (mensagem removida após ack) de log (mensagem retida e relida por offset)"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Descrever o ciclo publish → deliver → ack/nack → redelivery → DLQ"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Implementar em Java uma fila em memória com competing consumers, ack manual e redelivery por timeout"
+        },
+        {
+          "level": 2,
+          "type": "bug_hunt",
+          "title": "Encontrar o bug: consumidor que dá ack antes de processar e perde mensagens em crash"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Subir RabbitMQ local e observar redelivery e DLQ ao rejeitar mensagens com prefetch variado"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Construir um worker de envio de e-mails com retries limitados, DLQ e ferramenta de reprocessamento"
+        }
+      ]
+    },
+    "5.1.3": {
+      "summary": "No Pub/Sub o publicador envia para um tópico e cada assinatura recebe sua própria cópia, desacoplando produtor de quantos e quais consumidores existem; o fan-out custa armazenamento, controle de assinantes lentos e ausência de resposta ao publicador.",
+      "objectives": [
+        "Diferenciar Pub/Sub de point-to-point em termos de entrega e acoplamento",
+        "Explicar fan-out e o problema de assinantes lentos (backpressure, retenção)",
+        "Diferenciar assinaturas duráveis de efêmeras e o impacto em perda de mensagens",
+        "Combinar Pub/Sub com filas por assinante (ex.: SNS → SQS, exchange fanout no RabbitMQ)",
+        "Avaliar filtragem de mensagens no broker versus no consumidor"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "5.1.2",
+          "kind": "recommended",
+          "reason": "Pub/Sub é contrastado com o modelo point-to-point de filas"
+        }
+      ],
+      "checklist": [
+        "Explico por que o publicador não deve conhecer seus assinantes",
+        "Descrevo o que acontece com um assinante não durável desconectado durante a publicação",
+        "Desenho uma topologia fan-out com uma fila por serviço consumidor e justifico",
+        "Explico como Kafka implementa Pub/Sub com múltiplos consumer groups"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Comparar point-to-point e Pub/Sub para o evento PedidoCriado consumido por 3 serviços"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Implementar um event bus Pub/Sub em memória em Java com assinantes síncronos e assíncronos"
+        },
+        {
+          "level": 2,
+          "type": "interview",
+          "title": "Entrevista: como lidar com um assinante lento que atrasa os demais?"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Configurar exchange fanout no RabbitMQ e comparar filas duráveis e exclusivas após reinício do consumidor"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Construir notificações multicanal (e-mail, SMS, push) via Pub/Sub com filas independentes por canal"
+        }
+      ]
+    },
+    "5.1.4": {
+      "summary": "Event-Driven Architecture organiza o sistema em torno de fatos ocorridos (eventos) publicados por quem detém o dado, permitindo que outros serviços reajam sem acoplamento direto; exige cuidado com contrato de eventos, versionamento, consistência eventual e rastreabilidade.",
+      "objectives": [
+        "Diferenciar evento, comando e query e as implicações de cada um",
+        "Comparar event notification, event-carried state transfer e event sourcing",
+        "Projetar o schema de um evento com id, tipo, versão, timestamp e correlation id",
+        "Versionar eventos de forma compatível (backward/forward compatibility, schema registry)",
+        "Rastrear um fluxo assíncrono ponta a ponta com propagação de contexto de tracing"
+      ],
+      "estimatedMinutes": 90,
+      "prerequisites": [
+        {
+          "key": "5.1.3",
+          "kind": "recommended",
+          "reason": "EDA usa Pub/Sub como mecanismo de distribuição de eventos"
+        },
+        {
+          "key": "3.3.3",
+          "kind": "recommended",
+          "reason": "Fluxos assíncronos exigem tracing distribuído para depuração"
+        }
+      ],
+      "checklist": [
+        "Classifico mensagens de um domínio como eventos ou comandos e justifico",
+        "Escrevo um schema de evento versionado e explico que mudanças são compatíveis",
+        "Explico os trade-offs entre notification e event-carried state transfer",
+        "Descrevo como propagar traceId por headers de mensagens"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Classificar 10 mensagens de um e-commerce como evento, comando ou query"
+        },
+        {
+          "level": 2,
+          "type": "code_analysis",
+          "title": "Avaliar um record Java de evento e apontar campos ausentes para versionamento e rastreabilidade"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Identificar a quebra de compatibilidade ao renomear um campo de evento consumido por outro serviço"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Entrevista: event notification ou event-carried state transfer para sincronizar dados de cliente?"
+        },
+        {
+          "level": 4,
+          "type": "project",
+          "title": "Modelar e implementar o fluxo de pedido orientado a eventos (Pedido, Pagamento, Estoque) com correlation id"
+        }
+      ]
+    },
+    "5.1.5": {
+      "summary": "Kafka é um log distribuído, particionado e replicado: produtores fazem append em partições, brokers persistem segmentos em disco com escrita sequencial e page cache, e consumidores leem por offset em modelo pull, o que permite retenção longa e replay.",
+      "objectives": [
+        "Descrever a arquitetura do Kafka: brokers, tópicos, partições, réplicas, líder, ISR e controller (KRaft)",
+        "Explicar por que escrita sequencial, page cache, batching e zero-copy dão alto throughput",
+        "Configurar acks (0, 1, all) e min.insync.replicas e explicar o trade-off durabilidade vs latência",
+        "Explicar retenção por tempo/tamanho e log compaction",
+        "Produzir e consumir mensagens com o client Java oficial"
+      ],
+      "estimatedMinutes": 150,
+      "prerequisites": [
+        {
+          "key": "5.1.3",
+          "kind": "recommended",
+          "reason": "Kafka implementa Pub/Sub sobre um log"
+        },
+        {
+          "key": "1.2.9",
+          "kind": "recommended",
+          "reason": "O desempenho do Kafka depende de I/O sequencial e page cache"
+        },
+        {
+          "key": "3.2.12",
+          "kind": "recommended",
+          "reason": "Kafka replica partições entre brokers no modelo líder-seguidor"
+        }
+      ],
+      "checklist": [
+        "Explico o caminho de uma mensagem do producer até ser considerada committed com acks=all",
+        "Explico o que acontece quando uma réplica sai do ISR e como min.insync.replicas reage",
+        "Diferencio retenção por tempo de log compaction e dou um caso de uso de cada",
+        "Subo um cluster local, produzo e consumo mensagens em Java"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar líder, réplicas, ISR e high watermark de uma partição"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Escrever producer e consumer Java com KafkaProducer/KafkaConsumer e serialização JSON"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Derrubar um broker com acks=1 e acks=all e verificar perda de mensagens"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Medir o throughput do producer variando batch.size, linger.ms e compression.type"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Entrevista: por que o Kafka é rápido mesmo persistindo tudo em disco?"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Usar um tópico compactado como tabela de estado atual de preços e reconstruí-la em memória"
+        }
+      ]
+    },
+    "5.1.6": {
+      "summary": "Um tópico no Kafka é um nome lógico para um conjunto de partições; sua configuração (número de partições, replication factor, retenção, cleanup.policy) define paralelismo, durabilidade e custo de armazenamento.",
+      "objectives": [
+        "Criar e configurar tópicos com kafka-topics e AdminClient em Java",
+        "Escolher replication factor e min.insync.replicas para tolerar falhas de broker",
+        "Definir cleanup.policy (delete, compact) e retention de acordo com o caso de uso",
+        "Aplicar convenções de nomes e granularidade de tópicos (por entidade, por evento)",
+        "Explicar o custo de muitos tópicos/partições no cluster"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "5.1.5",
+          "kind": "required",
+          "reason": "Tópicos são um conceito interno do Kafka"
+        }
+      ],
+      "checklist": [
+        "Crio um tópico com configurações explícitas via AdminClient",
+        "Justifico replication factor 3 com min.insync.replicas 2",
+        "Decido entre um tópico por tipo de evento e um tópico por entidade em um cenário",
+        "Explico quando usar compact em vez de delete"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar a relação entre tópico, partição, segmento e réplica"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Criar e descrever tópicos via AdminClient em Java com configurações customizadas"
+        },
+        {
+          "level": 2,
+          "type": "interview",
+          "title": "Entrevista: um tópico por tipo de evento ou um tópico por agregado?"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Alterar retention.ms de um tópico e observar a remoção de segmentos no disco"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Escrever um provisionador de tópicos idempotente em Java a partir de um arquivo de configuração"
+        }
+      ]
+    },
+    "5.1.7": {
+      "summary": "Partições são a unidade de paralelismo, ordenação e replicação do Kafka: a chave da mensagem determina a partição via hash, cada partição é consumida por no máximo um consumidor do grupo, e aumentar partições depois altera o mapeamento chave→partição.",
+      "objectives": [
+        "Explicar o particionador padrão (murmur2 da chave, sticky partitioner sem chave)",
+        "Dimensionar o número de partições com base em throughput alvo e número de consumidores",
+        "Identificar hot partitions causadas por chaves desbalanceadas",
+        "Explicar o efeito de aumentar partições na ordenação por chave",
+        "Implementar um Partitioner customizado em Java"
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        {
+          "key": "5.1.6",
+          "kind": "recommended",
+          "reason": "Partições compõem a configuração de um tópico"
+        }
+      ],
+      "checklist": [
+        "Calculo quantas partições são necessárias para um throughput dado",
+        "Explico por que adicionar partições quebra a garantia de ordem por chave existente",
+        "Diagnostico uma hot partition a partir de métricas de lag por partição",
+        "Explico por que mais consumidores que partições não aumentam o paralelismo"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar como a chave define a partição e o papel do sticky partitioner"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Implementar um Partitioner Java que isola clientes VIP em partições dedicadas"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Produzir com chaves enviesadas e medir a distribuição e o lag por partição"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Diagnosticar a perda de ordem por conta após aumento de partições de um tópico"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Entrevista: como você escolheria o número de partições para 50 mil msgs/s?"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Construir ferramenta Java que analisa a distribuição de chaves e recomenda número de partições e chave composta"
+        }
+      ]
+    },
+    "5.1.8": {
+      "summary": "O offset é a posição sequencial de cada mensagem numa partição; o consumidor controla o próprio progresso commitando offsets no tópico __consumer_offsets, e o momento do commit em relação ao processamento define perda ou duplicação.",
+      "objectives": [
+        "Explicar offset, committed offset, high watermark e consumer lag",
+        "Comparar enable.auto.commit com commitSync/commitAsync manual",
+        "Relacionar o momento do commit com perda (commit antes) ou duplicação (commit depois)",
+        "Usar auto.offset.reset e seek para replay e recuperação",
+        "Monitorar consumer lag como indicador de saúde"
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        {
+          "key": "5.1.7",
+          "kind": "recommended",
+          "reason": "Offsets são definidos por partição"
+        }
+      ],
+      "checklist": [
+        "Explico o que acontece com auto commit se o consumidor cair após poll e antes de processar",
+        "Implemento commit manual após processamento com commitSync",
+        "Faço replay de uma partição a partir de um timestamp com offsetsForTimes e seek",
+        "Calculo e interpreto o consumer lag de um grupo"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Diferenciar offset atual, committed offset, high watermark e lag"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Implementar consumer Java com enable.auto.commit=false e commit por lote após processamento"
+        },
+        {
+          "level": 2,
+          "type": "bug_hunt",
+          "title": "Encontrar a causa de mensagens perdidas em um consumer com auto commit e processamento assíncrono"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Reprocessar eventos de ontem usando offsetsForTimes e seek"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Construir um monitor de consumer lag em Java com AdminClient e alerta por limite"
+        }
+      ]
+    },
+    "5.1.9": {
+      "summary": "Consumer groups distribuem as partições de um tópico entre instâncias para escalar o consumo; o group coordinator detecta entradas e saídas via heartbeats e max.poll.interval.ms e dispara rebalanceamento, que pode pausar o consumo e gerar duplicatas.",
+      "objectives": [
+        "Explicar o papel do group coordinator e do líder do grupo na atribuição de partições",
+        "Comparar estratégias de atribuição: range, round-robin, sticky e cooperative-sticky",
+        "Explicar as causas de rebalanceamento: session.timeout.ms, heartbeat e max.poll.interval.ms",
+        "Usar ConsumerRebalanceListener para commitar offsets antes da revogação",
+        "Reduzir o impacto de rebalances com static membership e rebalanceamento incremental"
+      ],
+      "estimatedMinutes": 120,
+      "prerequisites": [
+        {
+          "key": "5.1.8",
+          "kind": "required",
+          "reason": "Rebalanceamento só é compreensível entendendo commit de offsets"
+        },
+        {
+          "key": "4.4.7",
+          "kind": "recommended",
+          "reason": "Processamento paralelo dentro do consumidor costuma usar thread pools"
+        }
+      ],
+      "checklist": [
+        "Explico por que um processamento lento dentro do poll causa rebalance",
+        "Implemento ConsumerRebalanceListener commitando offsets em onPartitionsRevoked",
+        "Comparo stop-the-world (eager) com cooperative rebalancing",
+        "Explico como dois consumer groups leem o mesmo tópico de forma independente"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar como partições são redistribuídas quando um consumidor entra ou sai do grupo"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Subir Kafka local e observar rebalanceamento ao adicionar e remover consumidores"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Diagnosticar rebalances em loop causados por processamento acima de max.poll.interval.ms"
+        },
+        {
+          "level": 3,
+          "type": "coding",
+          "title": "Implementar ConsumerRebalanceListener que commita offsets processados antes da revogação"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Entrevista: diferença entre eager e cooperative-sticky rebalancing e quando importa"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Construir um consumidor Java com pool de workers por partição preservando ordem e commit seguro"
+        }
+      ]
+    },
+    "5.1.10": {
+      "summary": "Kafka garante ordem apenas dentro de uma partição; ordem por entidade exige mesma chave, e retries do producer, processamento paralelo no consumidor e reprocessamento podem reordenar mensagens se não forem controlados.",
+      "objectives": [
+        "Explicar por que não há ordem global entre partições e quando isso é aceitável",
+        "Escolher chaves de partição que preservem ordem por entidade",
+        "Explicar como max.in.flight.requests e retries afetam a ordem e como o idempotent producer a preserva",
+        "Tratar eventos fora de ordem no consumidor com versões ou números de sequência",
+        "Avaliar o custo de ordem estrita no throughput"
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        {
+          "key": "5.1.9",
+          "kind": "recommended",
+          "reason": "Paralelismo de consumo afeta diretamente a ordenação"
+        }
+      ],
+      "checklist": [
+        "Escolho a chave correta para garantir ordem dos eventos de uma conta",
+        "Explico o cenário em que retry com in-flight > 1 inverte duas mensagens sem idempotência",
+        "Implemento descarte de eventos antigos por número de versão no consumidor",
+        "Justifico quando ordem global vale uma partição única"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar o escopo da garantia de ordem no Kafka"
+        },
+        {
+          "level": 2,
+          "type": "code_analysis",
+          "title": "Analisar um producer Java e indicar quais configurações podem reordenar mensagens"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Encontrar por que eventos SaldoAtualizado são aplicados fora de ordem num consumidor multithread"
+        },
+        {
+          "level": 3,
+          "type": "coding",
+          "title": "Implementar no consumidor descarte de eventos desatualizados usando versão por agregado"
+        },
+        {
+          "level": 4,
+          "type": "experiment",
+          "title": "Comparar throughput de um tópico com 1 partição (ordem global) e 12 partições (ordem por chave)"
+        }
+      ]
+    },
+    "5.1.11": {
+      "summary": "At-most-once entrega cada mensagem zero ou uma vez: o progresso é registrado antes do processamento (ou não há retry), então falhas causam perda, mas nunca duplicação; é aceitável apenas quando a perda é tolerável.",
+      "objectives": [
+        "Definir at-most-once e identificar onde a perda pode ocorrer (producer e consumer)",
+        "Configurar producer (acks=0, retries=0) e consumer (commit antes de processar) para at-most-once",
+        "Identificar casos de uso adequados: métricas de alta frequência, telemetria, logs não críticos",
+        "Explicar por que at-most-once tem menor latência e custo"
+      ],
+      "estimatedMinutes": 45,
+      "prerequisites": [
+        {
+          "key": "5.1.8",
+          "kind": "required",
+          "reason": "A semântica no consumidor depende do momento do commit de offsets"
+        }
+      ],
+      "checklist": [
+        "Descrevo exatamente em que ponto uma mensagem é perdida em at-most-once",
+        "Configuro producer e consumer Java para at-most-once",
+        "Justifico um caso de uso real em que a perda é aceitável"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Desenhar a linha do tempo de uma falha que perde uma mensagem em at-most-once"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Configurar um consumer Java que commita antes de processar e provocar perda por crash"
+        },
+        {
+          "level": 2,
+          "type": "interview",
+          "title": "Entrevista: cite sistemas onde at-most-once é a escolha correta"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Medir latência e perda de um producer com acks=0 sob falha de broker"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Construir pipeline de telemetria at-most-once em Java com acks=0 e medir taxa de perda aceitável"
+        }
+      ]
+    },
+    "5.1.12": {
+      "summary": "At-least-once garante que nenhuma mensagem se perca, registrando progresso apenas após o processamento e usando retries, o que torna duplicatas inevitáveis; o consumidor precisa ser idempotente para que o efeito seja correto.",
+      "objectives": [
+        "Definir at-least-once e identificar as fontes de duplicação (retry do producer, crash antes do commit, rebalance)",
+        "Configurar producer (acks=all, retries) e consumer (commit após processar) para at-least-once",
+        "Implementar deduplicação no consumidor com chave de idempotência persistida",
+        "Explicar por que at-least-once + idempotência é o padrão mais usado na indústria"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "5.1.11",
+          "kind": "recommended",
+          "reason": "Contraste direto com a semântica anterior"
+        },
+        {
+          "key": "3.5.11",
+          "kind": "recommended",
+          "reason": "Idempotência é o complemento necessário do at-least-once"
+        }
+      ],
+      "checklist": [
+        "Descrevo três cenários distintos que geram duplicatas em at-least-once",
+        "Implemento um consumidor que commita após processar e deduplica por eventId",
+        "Explico por que deduplicar em memória não basta após restart ou rebalance"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Listar e explicar as três origens de duplicatas em at-least-once"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Implementar consumer Java com commit pós-processamento e tabela de eventos processados"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Provocar duplicatas matando o consumidor entre processamento e commit e medir o efeito"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Encontrar o bug de cobrança duplicada em um consumidor at-least-once sem deduplicação"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Construir consumidor de pagamentos que grava efeito e marca de processamento na mesma transação"
+        }
+      ]
+    },
+    "5.1.13": {
+      "summary": "Exactly-once no Kafka combina idempotent producer (PID + sequence number por partição), transações que gravam mensagens e offsets atomicamente e consumidores com isolation.level=read_committed; vale para pipelines Kafka→Kafka, enquanto efeitos externos exigem idempotência no destino.",
+      "objectives": [
+        "Explicar como o idempotent producer elimina duplicatas de retry usando producer id e sequence numbers",
+        "Explicar transações Kafka: transactional.id, transaction coordinator, markers e sendOffsetsToTransaction",
+        "Configurar isolation.level=read_committed e explicar o last stable offset",
+        "Delimitar o escopo do exactly-once e por que ele não se estende a bancos ou APIs externas",
+        "Avaliar o custo de latência e throughput das transações"
+      ],
+      "estimatedMinutes": 120,
+      "prerequisites": [
+        {
+          "key": "5.1.12",
+          "kind": "required",
+          "reason": "Exactly-once é construído sobre at-least-once com deduplicação"
+        },
+        {
+          "key": "3.2.1",
+          "kind": "recommended",
+          "reason": "Transações Kafka seguem a ideia de atomicidade de transações"
+        }
+      ],
+      "checklist": [
+        "Explico o que o broker faz ao receber uma mensagem com sequence number repetido",
+        "Implemento um pipeline consume-transform-produce transacional em Java",
+        "Explico por que exactly-once 'efetivo' para um banco externo exige idempotência ou Outbox",
+        "Explico o papel do transactional.id em fencing de producers zumbis"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar idempotent producer, transações e read_committed e o papel de cada um"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Implementar consume-transform-produce transacional em Java com sendOffsetsToTransaction"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Abortar transações e comparar o que consumidores read_uncommitted e read_committed enxergam"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Entrevista: exactly-once existe de verdade em sistemas distribuídos?"
+        },
+        {
+          "level": 4,
+          "type": "code_analysis",
+          "title": "Revisar um pipeline que grava no PostgreSQL e no Kafka e propor como obter efeito exactly-once"
+        }
+      ]
+    },
+    "5.2.1": {
+      "summary": "Falha parcial é quando parte do sistema falha enquanto o resto continua funcionando; como a rede não distingue lentidão, perda de pacote e crash, toda chamada remota tem resultado potencialmente desconhecido.",
+      "objectives": [
+        "Listar modos de falha: crash, omissão, lentidão, partição de rede e falhas bizantinas",
+        "Explicar por que uma chamada sem resposta pode ter sido executada (resultado ambíguo)",
+        "Explicar as falácias da computação distribuída e seu impacto em projeto",
+        "Identificar falhas em cascata causadas por esgotamento de recursos (threads, conexões)",
+        "Usar health checks e métricas para detectar degradação"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "3.1.4",
+          "kind": "recommended",
+          "reason": "Entender TCP ajuda a ver por que perda de conexão não indica o estado do servidor"
+        },
+        {
+          "key": "3.3.5",
+          "kind": "recommended",
+          "reason": "Health checks são o primeiro mecanismo de detecção de falhas"
+        }
+      ],
+      "checklist": [
+        "Explico os três desfechos possíveis de uma requisição que deu timeout",
+        "Descrevo como uma dependência lenta esgota o thread pool de um serviço e causa cascata",
+        "Classifico incidentes reais nos modos de falha estudados"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar por que um timeout não informa se a operação foi executada"
+        },
+        {
+          "level": 2,
+          "type": "code_analysis",
+          "title": "Analisar um serviço Spring que chama outro sem timeout e prever o comportamento sob lentidão"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Simular latência e perda com Toxiproxy entre dois serviços Java e observar a cascata"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Entrevista: quais falácias da computação distribuída você já viu causar incidente?"
+        },
+        {
+          "level": 4,
+          "type": "project",
+          "title": "Montar um laboratório de chaos com Docker e Toxiproxy para os próximos tópicos do módulo"
+        }
+      ]
+    },
+    "5.2.2": {
+      "summary": "Timeouts limitam quanto tempo um recurso fica preso esperando uma dependência; precisam ser definidos por camada (conexão, leitura, pool, requisição total) e coerentes com a cadeia de chamadas por meio de deadlines propagados.",
+      "objectives": [
+        "Diferenciar connect timeout, read/socket timeout, timeout de aquisição de pool e timeout total",
+        "Definir valores de timeout a partir de percentis de latência (p99) e do orçamento do chamador",
+        "Propagar deadlines por uma cadeia de serviços para evitar trabalho inútil",
+        "Configurar timeouts em HttpClient, RestClient/WebClient, JDBC/Hikari e Kafka client",
+        "Explicar o risco de timeouts infinitos (padrão de muitas bibliotecas)"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "5.2.1",
+          "kind": "recommended",
+          "reason": "Timeouts são a principal defesa contra falhas parciais por lentidão"
+        },
+        {
+          "key": "3.1.11",
+          "kind": "recommended",
+          "reason": "Conexões persistentes e pools influenciam os tipos de timeout"
+        }
+      ],
+      "checklist": [
+        "Configuro connect e read timeout distintos no java.net.http.HttpClient",
+        "Justifico valores de timeout a partir do p99 da dependência",
+        "Explico por que o timeout do serviço interno deve ser menor que o do chamador",
+        "Identifico bibliotecas com timeout padrão infinito no meu projeto"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Diferenciar connect, read, pool acquisition e request timeout"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Configurar timeouts no HttpClient do Java e no HikariCP e testar com servidor lento"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Encontrar o timeout ausente que trava todas as threads do Tomcat sob dependência lenta"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Medir o impacto de timeouts muito curtos na taxa de erro com latência de cauda"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar propagação de deadline por header entre serviços Spring"
+        }
+      ]
+    },
+    "5.2.3": {
+      "summary": "Retry repete uma operação que falhou por erro transitório; é seguro apenas para operações idempotentes e erros retentáveis, e precisa de limite de tentativas e orçamento para não amplificar carga em dependências já sobrecarregadas.",
+      "objectives": [
+        "Classificar erros em retentáveis (timeout, 503, conexão recusada) e não retentáveis (400, 409 de negócio)",
+        "Explicar a amplificação de retries em cadeias de serviços (retry storm)",
+        "Aplicar limite de tentativas e retry budget",
+        "Decidir em qual camada fazer retry para evitar retries aninhados",
+        "Implementar retry com Resilience4j ou Spring Retry"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "5.2.2",
+          "kind": "recommended",
+          "reason": "Retry normalmente é disparado por timeout"
+        },
+        {
+          "key": "3.5.11",
+          "kind": "recommended",
+          "reason": "Só operações idempotentes podem ser repetidas com segurança"
+        }
+      ],
+      "checklist": [
+        "Classifico corretamente códigos HTTP e exceções como retentáveis ou não",
+        "Calculo a amplificação de carga com 3 camadas fazendo 3 tentativas cada",
+        "Configuro retry com Resilience4j limitado a exceções específicas"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Classificar 12 erros como retentáveis ou não e justificar"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Implementar um RetryExecutor genérico em Java com predicado de exceções retentáveis"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Encontrar o retry que duplica pedidos ao repetir um POST não idempotente"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Entrevista: por que retries em todas as camadas podem derrubar o sistema?"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar retry budget (proporção máxima de retries por janela) em Java"
+        }
+      ]
+    },
+    "5.2.4": {
+      "summary": "Exponential backoff aumenta a espera entre tentativas geometricamente (base × 2^n, com teto), dando tempo para a dependência se recuperar e reduzindo a carga gerada por clientes em falha.",
+      "objectives": [
+        "Calcular a sequência de esperas para base, multiplicador e teto dados",
+        "Explicar por que intervalos fixos prolongam a sobrecarga",
+        "Definir teto de espera e tempo máximo total compatíveis com o SLA do chamador",
+        "Respeitar sinais do servidor como Retry-After e 429"
+      ],
+      "estimatedMinutes": 45,
+      "prerequisites": [
+        {
+          "key": "5.2.3",
+          "kind": "required",
+          "reason": "Backoff é uma política de espera entre retries"
+        }
+      ],
+      "checklist": [
+        "Calculo o tempo total gasto em 6 tentativas com backoff exponencial e teto",
+        "Implemento backoff exponencial com teto em Java",
+        "Explico como combinar backoff com o deadline da requisição original"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Calcular esperas e tempo total de backoff com base 100ms, fator 2 e teto 5s"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Implementar retry com exponential backoff e teto em Java respeitando Retry-After"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Comparar backoff fixo e exponencial na recuperação de um servidor sobrecarregado simulado"
+        },
+        {
+          "level": 3,
+          "type": "code_analysis",
+          "title": "Avaliar uma configuração de backoff que excede o timeout do cliente HTTP chamador"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Criar biblioteca Java de BackoffPolicy configurável com deadline total e testes determinísticos com Clock fake"
+        }
+      ]
+    },
+    "5.2.5": {
+      "summary": "Jitter adiciona aleatoriedade ao backoff para dessincronizar clientes que falharam ao mesmo tempo, evitando thundering herd — ondas sincronizadas de retries que voltam a sobrecarregar o servidor a cada intervalo.",
+      "objectives": [
+        "Explicar thundering herd e por que backoff exponencial sem jitter ainda sincroniza clientes",
+        "Comparar full jitter, equal jitter e decorrelated jitter",
+        "Implementar jitter usando ThreadLocalRandom",
+        "Aplicar jitter também a tarefas agendadas, expiração de cache e reconexões"
+      ],
+      "estimatedMinutes": 45,
+      "prerequisites": [
+        {
+          "key": "5.2.4",
+          "kind": "required",
+          "reason": "Jitter é aplicado sobre o backoff exponencial"
+        }
+      ],
+      "checklist": [
+        "Explico com um gráfico de requisições por segundo o efeito do jitter",
+        "Implemento full jitter e decorrelated jitter em Java",
+        "Identifico outros pontos do sistema sujeitos a thundering herd (TTL de cache, cron)"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar thundering herd e por que jitter resolve onde o backoff sozinho falha"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Implementar retry com exponential backoff e full jitter em Java"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Simular 1.000 clientes e plotar a carga por segundo sem jitter, com full e com decorrelated jitter"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Diagnosticar picos periódicos de carga causados por TTL de cache idêntico em todas as chaves"
+        },
+        {
+          "level": 2,
+          "type": "interview",
+          "title": "Entrevista: qual variante de jitter você escolheria e por quê?"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Adicionar jitter configurável à BackoffPolicy e aos agendamentos de reconexão de um consumer Kafka"
+        }
+      ]
+    },
+    "5.2.6": {
+      "summary": "Sob retries e entrega at-least-once, a mesma requisição ou mensagem chega mais de uma vez; idempotência garante que o efeito seja aplicado uma única vez, via idempotency keys, constraints únicas, operações naturalmente idempotentes e registro de processamento na mesma transação do efeito.",
+      "objectives": [
+        "Diferenciar operações naturalmente idempotentes (set) de não idempotentes (incremento, criação)",
+        "Implementar idempotency key em API HTTP com armazenamento da resposta original",
+        "Implementar deduplicação de mensagens com tabela de processadas e constraint única",
+        "Tratar a condição de corrida de duas requisições duplicadas simultâneas",
+        "Definir janela de retenção das chaves e seus custos"
+      ],
+      "estimatedMinutes": 90,
+      "prerequisites": [
+        {
+          "key": "3.5.11",
+          "kind": "recommended",
+          "reason": "Este tópico aprofunda a idempotência vista em APIs para o cenário de retries e at-least-once"
+        },
+        {
+          "key": "5.2.3",
+          "kind": "recommended",
+          "reason": "Retries são a principal origem de requisições duplicadas"
+        },
+        {
+          "key": "4.3.3",
+          "kind": "recommended",
+          "reason": "Duplicatas simultâneas criam race conditions na verificação de idempotência"
+        },
+        {
+          "key": "4.2.16",
+          "kind": "recommended",
+          "reason": "Efeito e marca de processamento devem estar na mesma transação"
+        }
+      ],
+      "checklist": [
+        "Implemento idempotency key que devolve a mesma resposta para requisições repetidas",
+        "Explico por que 'verificar e depois inserir' sem constraint única falha sob concorrência",
+        "Gravo efeito e registro de mensagem processada na mesma transação",
+        "Justifico por quanto tempo reter chaves de idempotência"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Classificar operações como naturalmente idempotentes ou não e propor como torná-las idempotentes"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Implementar filtro Spring de Idempotency-Key com cache da resposta no banco"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Encontrar a race condition em check-then-insert de idempotência sob requisições paralelas"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Reentregar mensagens Kafka duplicadas e verificar que o saldo final permanece correto"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Construir consumidor idempotente de pagamentos com tabela processed_messages e constraint única"
+        }
+      ]
+    },
+    "5.2.7": {
+      "summary": "Circuit breaker interrompe chamadas a uma dependência com alta taxa de falha, alternando entre Closed, Open e Half-Open, para falhar rápido, liberar recursos e dar tempo de recuperação à dependência.",
+      "objectives": [
+        "Descrever os estados Closed, Open e Half-Open e as transições entre eles",
+        "Configurar janela deslizante (por contagem ou tempo), failure rate threshold e slow call threshold",
+        "Definir fallback adequado por caso de uso",
+        "Combinar circuit breaker com retry e timeout na ordem correta",
+        "Usar Resilience4j e expor métricas de estado"
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        {
+          "key": "5.2.3",
+          "kind": "recommended",
+          "reason": "Circuit breaker complementa e limita retries"
+        },
+        {
+          "key": "5.2.2",
+          "kind": "recommended",
+          "reason": "Chamadas lentas que estouram timeout contam como falha"
+        }
+      ],
+      "checklist": [
+        "Desenho a máquina de estados com condições de transição",
+        "Implemento um circuit breaker simples em Java thread-safe",
+        "Explico por que retry deve ficar dentro ou fora do circuit breaker",
+        "Configuro Resilience4j com fallback e verifico transições nas métricas"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Desenhar a máquina de estados Closed/Open/Half-Open com as condições de transição"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Implementar um circuit breaker thread-safe em Java com janela por contagem"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Configurar Resilience4j num serviço Spring e observar as transições com Toxiproxy"
+        },
+        {
+          "level": 3,
+          "type": "code_analysis",
+          "title": "Analisar a ordem de decorators Retry, CircuitBreaker, TimeLimiter e Bulkhead e seus efeitos"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Entrevista: qual fallback é aceitável quando o serviço de preços está fora?"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Construir cliente HTTP resiliente em Java com circuit breaker próprio, fallback e endpoint de métricas de estado"
+        }
+      ]
+    },
+    "5.2.8": {
+      "summary": "Rate limiting limita quantas requisições um cliente pode fazer por período para proteger recursos e garantir justiça; algoritmos como token bucket, leaky bucket, fixed window e sliding window diferem em tolerância a bursts, precisão e custo de memória, e a versão distribuída exige estado compartilhado.",
+      "objectives": [
+        "Comparar token bucket, leaky bucket, fixed window, sliding window log e sliding window counter",
+        "Explicar o problema de borda da fixed window e como a sliding window resolve",
+        "Implementar rate limiting distribuído com Redis e operações atômicas",
+        "Responder corretamente com 429 e cabeçalhos de limite/Retry-After",
+        "Diferenciar rate limiting (cliente) de load shedding (servidor)"
+      ],
+      "estimatedMinutes": 90,
+      "prerequisites": [
+        {
+          "key": "5.2.5",
+          "kind": "recommended",
+          "reason": "Clientes limitados devem reagir com backoff e jitter"
+        },
+        {
+          "key": "4.3.3",
+          "kind": "recommended",
+          "reason": "Contadores compartilhados exigem operações atômicas"
+        }
+      ],
+      "checklist": [
+        "Explico quando o token bucket permite burst e o leaky bucket não",
+        "Implemento token bucket thread-safe em Java",
+        "Mostro o problema de dupla taxa na borda da fixed window",
+        "Descrevo como garantir atomicidade de um limitador distribuído no Redis"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Comparar token bucket e sliding window em tolerância a burst, precisão e memória"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Implementar token bucket thread-safe em Java com refill preguiçoso"
+        },
+        {
+          "level": 3,
+          "type": "coding",
+          "title": "Implementar sliding window counter e demonstrar a correção do problema de borda"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Encontrar a race condition de um rate limiter distribuído com GET e SET separados no Redis"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Construir rate limiter por cliente em filtro Spring com Redis, 429 e Retry-After"
+        }
+      ]
+    },
+    "5.2.9": {
+      "summary": "Fault tolerance é a capacidade de continuar operando aceitavelmente diante de falhas, combinando redundância, isolamento (bulkheads), detecção, failover, fallback, load shedding e degradação graciosa, sem que os próprios mecanismos amplifiquem o problema.",
+      "objectives": [
+        "Diferenciar alta disponibilidade, fault tolerance e resiliência",
+        "Aplicar bulkhead com thread pools ou semáforos isolados por dependência",
+        "Projetar degradação graciosa e load shedding para picos",
+        "Combinar timeout, retry, circuit breaker, rate limiting e bulkhead em uma política coerente",
+        "Validar a estratégia com testes de caos"
+      ],
+      "estimatedMinutes": 90,
+      "prerequisites": [
+        {
+          "key": "5.2.7",
+          "kind": "recommended",
+          "reason": "Fault tolerance combina os mecanismos anteriores do módulo"
+        },
+        {
+          "key": "5.2.8",
+          "kind": "recommended",
+          "reason": "Rate limiting e load shedding fazem parte da estratégia"
+        },
+        {
+          "key": "4.4.7",
+          "kind": "recommended",
+          "reason": "Bulkheads costumam ser implementados com thread pools isolados"
+        }
+      ],
+      "checklist": [
+        "Proponho política de resiliência completa para uma dependência crítica e justifico cada parâmetro",
+        "Implemento bulkhead isolando duas dependências e demonstro o isolamento",
+        "Defino o comportamento degradado de cada funcionalidade quando dependências falham",
+        "Executo um experimento de caos e documento o resultado"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar como bulkhead impede que uma dependência lenta derrube as demais"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Implementar bulkhead com thread pools separados por dependência em Java"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Entrevista: desenhe a estratégia de resiliência de um checkout com 5 dependências"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Executar game day com Toxiproxy derrubando dependências e medir degradação graciosa"
+        },
+        {
+          "level": 4,
+          "type": "project",
+          "title": "Construir serviço de catálogo resiliente combinando timeout, retry com jitter, circuit breaker, bulkhead e fallback em cache"
+        }
+      ]
+    },
+    "5.3.1": {
+      "summary": "Replicação mantém cópias dos dados em vários nós para disponibilidade, tolerância a falhas e escala de leitura; o modelo (líder-seguidor, multi-líder, leaderless) e o modo (síncrono, assíncrono, semissíncrono) determinam quais garantias de consistência os clientes observam.",
+      "objectives": [
+        "Comparar replicação líder-seguidor, multi-líder e leaderless",
+        "Explicar replicação síncrona, assíncrona e semissíncrona e o risco de perda no failover",
+        "Identificar anomalias de replication lag: read-your-writes, monotonic reads, consistent prefix",
+        "Explicar resolução de conflitos em multi-líder (last-write-wins, version vectors, CRDTs)",
+        "Descrever failover e o risco de split-brain"
+      ],
+      "estimatedMinutes": 90,
+      "prerequisites": [
+        {
+          "key": "3.2.12",
+          "kind": "recommended",
+          "reason": "Este tópico aprofunda a replicação de banco vista antes para replicação entre nós e modelos de consistência"
+        },
+        {
+          "key": "3.2.11",
+          "kind": "recommended",
+          "reason": "MVCC e WAL ajudam a entender como mudanças são enviadas às réplicas"
+        }
+      ],
+      "checklist": [
+        "Explico a perda de escritas confirmadas no failover com replicação assíncrona",
+        "Descrevo uma solução para read-your-writes com réplicas de leitura",
+        "Comparo last-write-wins e version vectors na resolução de conflitos",
+        "Explico como split-brain acontece e como fencing o previne"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Comparar líder-seguidor, multi-líder e leaderless quanto a conflitos e disponibilidade"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Subir PostgreSQL primário + réplica com Docker e medir replication lag sob carga"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Diagnosticar usuário que não vê o próprio comentário após salvar (leitura em réplica atrasada)"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Entrevista: o que pode dar errado no failover automático de um banco?"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar roteamento leitura/escrita em Spring com read-your-writes por sessão"
+        }
+      ]
+    },
+    "5.3.2": {
+      "summary": "Consistência forte (linearizability) faz o sistema se comportar como se houvesse uma única cópia: toda leitura vê a escrita mais recente confirmada; exige coordenação (líder único, quorum ou consenso), com custo de latência e indisponibilidade em partições de rede.",
+      "objectives": [
+        "Definir linearizability e diferenciá-la de serializability",
+        "Explicar o teorema CAP corretamente (escolha durante partição) e o PACELC",
+        "Identificar operações que exigem consistência forte: locks, unicidade, saldo",
+        "Explicar o custo de latência da consistência forte entre regiões"
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        {
+          "key": "5.3.1",
+          "kind": "required",
+          "reason": "Consistência é uma propriedade do sistema replicado"
+        },
+        {
+          "key": "3.2.3",
+          "kind": "recommended",
+          "reason": "Isolation levels ajudam a diferenciar serializability de linearizability"
+        }
+      ],
+      "checklist": [
+        "Diferencio linearizability de serializability com exemplos",
+        "Explico CAP sem o erro de 'escolha 2 de 3'",
+        "Identifico num sistema quais operações precisam de consistência forte e justifico",
+        "Estimo a latência mínima de uma escrita linearizável entre duas regiões"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Diferenciar linearizability e serializability com um exemplo de histórico de operações"
+        },
+        {
+          "level": 2,
+          "type": "code_analysis",
+          "title": "Analisar históricos de leitura/escrita e decidir se são linearizáveis"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Entrevista: explique CAP e PACELC e classifique PostgreSQL, Cassandra e etcd"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Medir a latência de escrita com replicação síncrona versus assíncrona no PostgreSQL"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar verificação de unicidade de e-mail linearizável usando constraint única e lock no líder"
+        }
+      ]
+    },
+    "5.3.3": {
+      "summary": "Consistência eventual garante apenas que, sem novas escritas, as réplicas convergem; permite alta disponibilidade e baixa latência, mas exige lidar com leituras desatualizadas, conflitos e garantias de sessão no nível da aplicação.",
+      "objectives": [
+        "Definir consistência eventual e a janela de inconsistência",
+        "Explicar garantias intermediárias: read-your-writes, monotonic reads, causal consistency",
+        "Projetar a UX e a lógica de negócio tolerantes a leituras desatualizadas",
+        "Explicar mecanismos de convergência: anti-entropy, read repair, CRDTs"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "5.3.2",
+          "kind": "recommended",
+          "reason": "Consistência eventual é entendida em contraste com a forte"
+        }
+      ],
+      "checklist": [
+        "Identifico funcionalidades que toleram consistência eventual e outras que não",
+        "Explico como read repair e anti-entropy fazem réplicas convergirem",
+        "Proponho mitigação de UX para leitura desatualizada após escrita",
+        "Explico por que eventos assíncronos entre serviços geram consistência eventual"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar a janela de inconsistência e as garantias de sessão"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Implementar um G-Counter CRDT em Java e demonstrar convergência entre réplicas"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Entrevista: o contador de likes pode ser eventual? E o estoque de um produto?"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Medir o tempo de convergência entre serviço de pedidos e read model atualizado via Kafka"
+        },
+        {
+          "level": 4,
+          "type": "project",
+          "title": "Construir read model eventual de pedidos via Kafka com indicação de status pendente na API"
+        }
+      ]
+    },
+    "5.3.4": {
+      "summary": "Em sistemas leaderless, quorums exigem W confirmações de escrita e R respostas de leitura entre N réplicas; com R+W>N os conjuntos se sobrepõem e a leitura encontra a versão mais recente, mas ainda há casos-limite com sloppy quorum, escritas concorrentes e falhas parciais.",
+      "objectives": [
+        "Explicar por que R+W>N garante sobreposição entre conjuntos de leitura e escrita",
+        "Escolher N, R e W para otimizar leitura, escrita ou disponibilidade",
+        "Explicar sloppy quorum e hinted handoff",
+        "Identificar casos em que quorum não garante linearizability",
+        "Relacionar com os níveis de consistência do Cassandra (ONE, QUORUM, ALL)"
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        {
+          "key": "5.3.3",
+          "kind": "recommended",
+          "reason": "Quorums ajustam o ponto entre consistência eventual e forte"
+        }
+      ],
+      "checklist": [
+        "Calculo quantas falhas são toleradas para leitura e escrita com N=5, R=2, W=4",
+        "Explico por que R+W>N não basta quando a escrita falha parcialmente",
+        "Explico hinted handoff e seu impacto na consistência"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Calcular tolerância a falhas e garantias para várias combinações de N, R e W"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Simular em Java um store leaderless com N réplicas, quorum configurável e versões"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Encontrar o cenário em que um quorum R+W>N retorna valor antigo após escrita parcial"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Entrevista: que configuração de quorum você usaria para um carrinho de compras?"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Adicionar read repair ao store leaderless simulado e medir convergência"
+        }
+      ]
+    },
+    "5.3.5": {
+      "summary": "Consenso permite que nós concordem sobre um valor mesmo com falhas; Raft faz isso elegendo um líder por termo e replicando um log que só é commitado após maioria, base de sistemas como etcd, ZooKeeper (ZAB) e o KRaft do Kafka.",
+      "objectives": [
+        "Explicar o problema do consenso e por que maioria (2f+1 nós para f falhas) é necessária",
+        "Descrever eleição de líder no Raft: termos, timeouts aleatórios e votos",
+        "Descrever replicação de log e regra de commit por maioria",
+        "Explicar como consenso evita split-brain",
+        "Identificar usos práticos: eleição de líder, locks distribuídos, configuração"
+      ],
+      "estimatedMinutes": 120,
+      "prerequisites": [
+        {
+          "key": "5.3.4",
+          "kind": "recommended",
+          "reason": "Consenso usa o raciocínio de maioria dos quorums"
+        },
+        {
+          "key": "5.2.5",
+          "kind": "recommended",
+          "reason": "Raft usa election timeouts aleatórios pelo mesmo motivo do jitter"
+        }
+      ],
+      "checklist": [
+        "Explico uma eleição Raft passo a passo, incluindo voto dividido",
+        "Explico por que um cluster de 4 nós não tolera mais falhas que um de 3",
+        "Explico por que uma entrada só é commitada após replicação na maioria",
+        "Cito onde consenso é usado no Kafka e no Kubernetes"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar por que consenso exige maioria e calcular falhas toleradas para 3, 4 e 5 nós"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Usar o visualizador do Raft para provocar eleições, votos divididos e partição de rede"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Entrevista: como o Raft impede dois líderes no mesmo termo?"
+        },
+        {
+          "level": 3,
+          "type": "experiment",
+          "title": "Subir cluster etcd de 3 nós, derrubar o líder e observar reeleição e indisponibilidade de escrita sem maioria"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Implementar em Java a eleição de líder do Raft simulada com nós em threads"
+        }
+      ]
+    },
+    "5.3.6": {
+      "summary": "Transações distribuídas buscam atomicidade quando uma operação altera dados em vários bancos ou serviços; como não existe um único log de commit, é preciso escolher entre coordenação síncrona (2PC/XA) e abordagens baseadas em eventos e compensação com consistência eventual.",
+      "objectives": [
+        "Explicar por que @Transactional local não cobre chamadas a outros serviços",
+        "Identificar o problema do dual write (banco + broker, banco + API)",
+        "Comparar 2PC, Outbox e Saga em consistência, disponibilidade e acoplamento",
+        "Decidir quando reestruturar fronteiras de serviço para evitar a transação distribuída"
+      ],
+      "estimatedMinutes": 60,
+      "prerequisites": [
+        {
+          "key": "3.2.2",
+          "kind": "required",
+          "reason": "É preciso entender ACID local para ver o que se perde na distribuição"
+        },
+        {
+          "key": "4.2.16",
+          "kind": "recommended",
+          "reason": "Mostra o limite do @Transactional ao envolver outros recursos"
+        },
+        {
+          "key": "5.3.3",
+          "kind": "recommended",
+          "reason": "As alternativas ao 2PC aceitam consistência eventual"
+        }
+      ],
+      "checklist": [
+        "Explico os modos de falha de um dual write e suas consequências",
+        "Identifico em código uma transação distribuída disfarçada",
+        "Escolho a abordagem adequada para três cenários diferentes e justifico"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar por que ACID não se estende naturalmente a vários serviços"
+        },
+        {
+          "level": 2,
+          "type": "bug_hunt",
+          "title": "Encontrar o dual write em um método @Transactional que salva no banco e publica no Kafka"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Entrevista: transferência entre contas em serviços diferentes — como garantir consistência?"
+        },
+        {
+          "level": 3,
+          "type": "code_analysis",
+          "title": "Analisar as falhas possíveis em cada linha de um fluxo que chama 3 serviços dentro de @Transactional"
+        },
+        {
+          "level": 4,
+          "type": "project",
+          "title": "Redesenhar uma transferência entre serviços usando Outbox e Saga em vez de chamadas dentro de @Transactional"
+        }
+      ]
+    },
+    "5.3.7": {
+      "summary": "Two-Phase Commit coordena participantes em uma fase de prepare (votação com recursos bloqueados) e uma de commit/abort; garante atomicidade, mas o coordenador é ponto único de bloqueio: se falhar após o prepare, participantes ficam em dúvida segurando locks.",
+      "objectives": [
+        "Descrever as fases prepare e commit e o que cada participante persiste",
+        "Explicar o estado in-doubt e por que participantes não podem decidir sozinhos",
+        "Explicar o impacto de locks mantidos durante o protocolo em throughput",
+        "Relacionar 2PC com XA/JTA em Java e com o 3PC",
+        "Explicar por que 2PC é pouco usado entre microsserviços"
+      ],
+      "estimatedMinutes": 75,
+      "prerequisites": [
+        {
+          "key": "5.3.6",
+          "kind": "recommended",
+          "reason": "2PC é a abordagem clássica para transações distribuídas"
+        },
+        {
+          "key": "3.2.7",
+          "kind": "recommended",
+          "reason": "Os participantes mantêm locks entre as fases"
+        },
+        {
+          "key": "4.3.11",
+          "kind": "recommended",
+          "reason": "Locks distribuídos mantidos por longos períodos podem gerar deadlocks e contenção"
+        }
+      ],
+      "checklist": [
+        "Desenho a sequência de mensagens do 2PC com sucesso e com abort",
+        "Explico o que acontece se o coordenador cai após todos votarem sim",
+        "Justifico por que 2PC reduz disponibilidade",
+        "Explico o PREPARE TRANSACTION do PostgreSQL"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Desenhar o diagrama de sequência do 2PC com commit e com abort"
+        },
+        {
+          "level": 2,
+          "type": "experiment",
+          "title": "Usar PREPARE TRANSACTION e COMMIT PREPARED no PostgreSQL e observar locks em dúvida"
+        },
+        {
+          "level": 3,
+          "type": "coding",
+          "title": "Simular coordenador e participantes 2PC em Java e injetar falha do coordenador após o prepare"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Entrevista: por que 2PC é chamado de protocolo bloqueante?"
+        },
+        {
+          "level": 4,
+          "type": "implementation",
+          "title": "Adicionar log de decisão e recuperação do coordenador ao simulador 2PC em Java"
+        }
+      ]
+    },
+    "5.3.8": {
+      "summary": "O Transactional Outbox resolve o dual write gravando o evento numa tabela outbox na mesma transação local da mudança de estado; um relay (polling ou CDC com Debezium lendo o WAL) publica no broker com entrega at-least-once.",
+      "objectives": [
+        "Explicar como a outbox garante atomicidade entre estado e evento",
+        "Implementar relay por polling com SELECT ... FOR UPDATE SKIP LOCKED",
+        "Explicar CDC com Debezium e comparar com polling (latência, carga, operação)",
+        "Garantir ordem por agregado e idempotência no consumidor",
+        "Definir limpeza e retenção da tabela outbox"
+      ],
+      "estimatedMinutes": 120,
+      "prerequisites": [
+        {
+          "key": "5.3.6",
+          "kind": "required",
+          "reason": "Outbox é a solução para o problema do dual write"
+        },
+        {
+          "key": "5.1.12",
+          "kind": "recommended",
+          "reason": "O relay entrega at-least-once"
+        },
+        {
+          "key": "5.2.6",
+          "kind": "recommended",
+          "reason": "Consumidores da outbox precisam ser idempotentes"
+        },
+        {
+          "key": "3.2.7",
+          "kind": "recommended",
+          "reason": "Polling concorrente usa locks com SKIP LOCKED"
+        }
+      ],
+      "checklist": [
+        "Implemento a escrita do evento na outbox dentro do mesmo @Transactional",
+        "Implemento um relay por polling que suporta múltiplas instâncias",
+        "Explico quando o relay pode publicar duplicatas e como o consumidor lida",
+        "Comparo polling e CDC para um caso concreto"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Explicar por que a outbox resolve o dual write e onde a duplicação ainda ocorre"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Implementar em Spring a gravação do pedido e do evento na tabela outbox na mesma transação"
+        },
+        {
+          "level": 3,
+          "type": "coding",
+          "title": "Implementar relay por polling com FOR UPDATE SKIP LOCKED publicando no Kafka"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Encontrar o bug de eventos fora de ordem em um relay multi-instância"
+        },
+        {
+          "level": 4,
+          "type": "experiment",
+          "title": "Configurar Debezium sobre o WAL do PostgreSQL e comparar latência com o relay por polling"
+        }
+      ]
+    },
+    "5.3.9": {
+      "summary": "Saga divide uma transação de negócio em uma sequência de transações locais, cada uma com uma compensação semântica que desfaz seu efeito em caso de falha; troca isolamento por disponibilidade e exige lidar com anomalias como dirty reads entre etapas.",
+      "objectives": [
+        "Modelar uma Saga com transações locais e compensações correspondentes",
+        "Diferenciar transações compensáveis, pivot e retentáveis",
+        "Projetar compensações idempotentes e semanticamente corretas (estorno, não delete)",
+        "Mitigar a falta de isolamento com semantic locks, estados pendentes e reordenação de passos",
+        "Persistir o estado da Saga para recuperação após falha"
+      ],
+      "estimatedMinutes": 120,
+      "prerequisites": [
+        {
+          "key": "5.3.8",
+          "kind": "recommended",
+          "reason": "Passos da Saga publicam eventos de forma confiável via Outbox"
+        },
+        {
+          "key": "5.2.6",
+          "kind": "recommended",
+          "reason": "Passos e compensações são reexecutados e precisam ser idempotentes"
+        }
+      ],
+      "checklist": [
+        "Modelo uma Saga de pedido com passos, compensações e pivot",
+        "Explico por que compensação não é rollback",
+        "Identifico uma anomalia por falta de isolamento e proponho contramedida",
+        "Implemento compensações idempotentes"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Modelar passos, compensações e pivot da Saga de reserva de viagem"
+        },
+        {
+          "level": 2,
+          "type": "coding",
+          "title": "Implementar em Java uma Saga de pedido com reserva de estoque, pagamento e compensações"
+        },
+        {
+          "level": 3,
+          "type": "bug_hunt",
+          "title": "Encontrar a compensação não idempotente que estorna o pagamento duas vezes"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Entrevista: como lidar com a falta de isolamento entre passos de uma Saga?"
+        },
+        {
+          "level": 4,
+          "type": "project",
+          "title": "Construir Saga de checkout com estado persistido e recuperação após crash do serviço"
+        }
+      ]
+    },
+    "5.3.10": {
+      "summary": "Sagas podem ser coordenadas por coreografia (serviços reagem a eventos uns dos outros, sem coordenador) ou orquestração (um orquestrador envia comandos e mantém a máquina de estados); a escolha afeta acoplamento, visibilidade do fluxo e facilidade de evolução.",
+      "objectives": [
+        "Comparar coreografia e orquestração em acoplamento, visibilidade e testabilidade",
+        "Identificar o risco de dependências cíclicas e fluxo implícito na coreografia",
+        "Implementar um orquestrador como máquina de estados persistida",
+        "Conhecer ferramentas de orquestração (Temporal, Camunda) e quando adotá-las",
+        "Escolher a abordagem para um fluxo dado e justificar"
+      ],
+      "estimatedMinutes": 90,
+      "prerequisites": [
+        {
+          "key": "5.3.9",
+          "kind": "required",
+          "reason": "São estilos de coordenação de uma Saga"
+        },
+        {
+          "key": "5.1.4",
+          "kind": "recommended",
+          "reason": "Coreografia é uma aplicação direta de Event-Driven Architecture"
+        }
+      ],
+      "checklist": [
+        "Desenho o mesmo fluxo nas duas abordagens e aponto diferenças",
+        "Explico como rastrear o andamento de uma Saga coreografada",
+        "Implemento um orquestrador com estado persistido",
+        "Justifico a escolha para um fluxo com 3 e outro com 8 passos"
+      ],
+      "plannedChallenges": [
+        {
+          "level": 1,
+          "type": "conceptual",
+          "title": "Comparar coreografia e orquestração para a Saga de pedido"
+        },
+        {
+          "level": 2,
+          "type": "code_analysis",
+          "title": "Mapear o fluxo implícito de uma Saga coreografada a partir dos listeners Kafka de 4 serviços"
+        },
+        {
+          "level": 3,
+          "type": "interview",
+          "title": "Entrevista: quando a coreografia vira um 'event spaghetti' e como migrar?"
+        },
+        {
+          "level": 3,
+          "type": "coding",
+          "title": "Implementar um orquestrador de Saga em Java como máquina de estados persistida"
+        },
+        {
+          "level": 4,
+          "type": "project",
+          "title": "Implementar o checkout coreografado e depois orquestrado, comparando rastreabilidade e esforço de mudança"
+        }
+      ]
+    }
+  }
+}
